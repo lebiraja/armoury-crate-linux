@@ -100,6 +100,23 @@ impl Bios {
     pub fn set_panel_od(&self, _b: bool) -> Result<()> {
         Ok(())
     }
+
+    // Mock NV/dGPU tunables
+    pub fn nv_dynamic_boost(&self) -> Result<i16> {
+        Ok(0)
+    }
+
+    pub fn set_nv_dynamic_boost(&self, _v: i16) -> Result<()> {
+        Ok(())
+    }
+
+    pub fn nv_temp_target(&self) -> Result<i16> {
+        Ok(0)
+    }
+
+    pub fn set_nv_temp_target(&self, _v: i16) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub struct Profile;

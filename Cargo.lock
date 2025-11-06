@@ -185,6 +185,7 @@ dependencies = [
  "rog_scsi",
  "rog_slash",
  "serde",
+ "tempfile",
  "tokio",
  "udev 0.8.0",
  "zbus",

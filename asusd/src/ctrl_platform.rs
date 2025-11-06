@@ -565,7 +565,7 @@ impl CtrlPlatform {
 
             for attr in self.attributes.attributes() {
                 let name: FirmwareAttribute = attr.name().into();
-                if name.is_ppt() {
+                if name.is_ppt() || name.is_dgpu() {
                     // reset stored value
                     if let Some(tune) = self
                         .config

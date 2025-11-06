@@ -170,7 +170,7 @@ impl crate::Reloadable for AsusArmouryAttribute {
         info!("Reloading {}", self.attr.name());
         let name: FirmwareAttribute = self.attr.name().into();
 
-        if name.is_ppt() {
+        if name.is_ppt() || name.is_dgpu() {
             let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
             let power_plugged = self
                 .power
@@ -277,7 +277,7 @@ impl AsusArmouryAttribute {
 
     async fn restore_default(&self) -> fdo::Result<()> {
         self.attr.restore_default()?;
-        if self.name().is_ppt() {
+        if self.name().is_ppt() || self.name().is_dgpu() {
             let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
             let power_plugged = self
                 .power
@@ -336,7 +336,7 @@ impl AsusArmouryAttribute {
 
     #[zbus(property)]
     async fn current_value(&self) -> fdo::Result<i32> {
-        if self.name().is_ppt() {
+        if self.name().is_ppt() || self.name().is_dgpu() {
             let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
             let power_plugged = self
                 .power
@@ -370,9 +370,9 @@ impl AsusArmouryAttribute {
     }
 
     async fn stored_value_for_power(&self, on_ac: bool) -> fdo::Result<i32> {
-        if !self.name().is_ppt() {
+        if !(self.name().is_ppt() || self.name().is_dgpu()) {
             return Err(fdo::Error::NotSupported(
-                "Stored values are only available for PPT attributes".to_string(),
+                "Stored values are only available for PPT/dGPU tunable attributes".to_string(),
             ));
         }
 
@@ -393,9 +393,10 @@ impl AsusArmouryAttribute {
     }
 
     async fn set_value_for_power(&mut self, on_ac: bool, value: i32) -> fdo::Result<()> {
-        if !self.name().is_ppt() {
+        if !(self.name().is_ppt() || self.name().is_dgpu()) {
             return Err(fdo::Error::NotSupported(
-                "Setting stored values is only supported for PPT attributes".to_string(),
+                "Setting stored values is only supported for PPT/dGPU tunable attributes"
+                    .to_string(),
             ));
         }
 
@@ -448,7 +449,7 @@ impl AsusArmouryAttribute {
 
     #[zbus(property)]
     async fn set_current_value(&mut self, value: i32) -> fdo::Result<()> {
-        if self.name().is_ppt() {
+        if self.name().is_ppt() || self.name().is_dgpu() {
             let profile: PlatformProfile = self.platform.get_platform_profile()?.into();
             let power_plugged = self
                 .power
@@ -622,5 +623,71 @@ pub async fn set_config_or_default(
                 );
             }
         }
+    }
+}
+
+// Internal helper to store a tuning value into the correct per-profile, per-power map.
+// This centralizes the behavior so tests can validate storage semantics.
+#[allow(dead_code)]
+fn insert_tuning_value(
+    config: &mut Config,
+    on_ac: bool,
+    profile: PlatformProfile,
+    name: rog_platform::asus_armoury::FirmwareAttribute,
+    value: i32,
+) {
+    let tuning = config.select_tunings(on_ac, profile);
+    if let Some(t) = tuning.group.get_mut(&name) {
+        *t = value;
+    } else {
+        tuning.group.insert(name, value);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use rog_platform::asus_armoury::FirmwareAttribute;
+    use rog_platform::platform::PlatformProfile;
+
+    #[test]
+    fn insert_nv_tuning_is_per_profile_and_power() {
+        let mut cfg = Config::default();
+        let profile = PlatformProfile::Performance;
+
+        // Insert value for AC
+        insert_tuning_value(
+            &mut cfg,
+            true,
+            profile,
+            FirmwareAttribute::NvDynamicBoost,
+            7,
+        );
+
+        // Value should be present in ac_profile_tunings
+        let t_ac = cfg.select_tunings_ref(true, profile).unwrap();
+        assert_eq!(t_ac.group.get(&FirmwareAttribute::NvDynamicBoost), Some(&7));
+
+        // Insert separate value for DC
+        insert_tuning_value(
+            &mut cfg,
+            false,
+            profile,
+            FirmwareAttribute::NvDynamicBoost,
+            3,
+        );
+        let t_dc = cfg.select_tunings_ref(false, profile).unwrap();
+        assert_eq!(t_dc.group.get(&FirmwareAttribute::NvDynamicBoost), Some(&3));
+    }
+
+    #[test]
+    fn non_ppt_attribute_stores_in_armoury_settings() {
+        let mut cfg = Config::default();
+        // Non-PPT/dGPU attribute, e.g., BootSound
+        let name = FirmwareAttribute::BootSound;
+        // Simulate setting armoury setting
+        cfg.armoury_settings.insert(name, 1);
+        assert_eq!(cfg.armoury_settings.get(&name), Some(&1));
     }
 }

@@ -45,6 +45,7 @@ concat-idents.workspace = true
 
 [dev-dependencies]
 cargo-husky.workspace = true
+tempfile = "3"
 
 [package.metadata.deb]
 license-file = ["../LICENSE", "4"]

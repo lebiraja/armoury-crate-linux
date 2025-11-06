@@ -244,6 +244,37 @@ impl FirmwareAttributes {
         Self { attrs }
     }
 
+    /// Create attributes collection from an arbitrary base directory. Intended for tests
+    /// where a fake sysfs-like layout can be supplied.
+    pub fn from_dir(base_dir: &std::path::Path) -> Self {
+        let mut attrs = Vec::new();
+        if let Ok(dir) = read_dir(base_dir) {
+            for entry in dir.flatten() {
+                let base_path = entry.path();
+                let name = base_path.file_name().unwrap().to_string_lossy().to_string();
+                if name == "pending_reboot" {
+                    continue;
+                }
+                let help = read_string(&base_path.join("display_name")).unwrap_or_default();
+
+                let (default_value, possible_values, min_value, max_value, scalar_increment) =
+                    Attribute::read_base_values(&base_path);
+
+                attrs.push(Attribute {
+                    name,
+                    help,
+                    default_value,
+                    possible_values,
+                    min_value,
+                    max_value,
+                    scalar_increment,
+                    base_path,
+                });
+            }
+        }
+        Self { attrs }
+    }
+
     pub fn attributes(&self) -> &Vec<Attribute> {
         &self.attrs
     }
