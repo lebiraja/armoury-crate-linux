@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Make the boot process more reliable
 - tie nv_ properties to power profiles
 - Better support nv_tgp
 
