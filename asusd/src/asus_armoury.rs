@@ -524,6 +524,7 @@ impl AsusArmouryAttribute {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn start_attributes_zbus(
     conn: Option<&Connection>,
     platform: RogPlatform,
@@ -609,20 +610,18 @@ pub async fn start_attributes_zbus(
                             e
                         })?;
                 }
-            } else {
-                if let Some(saved_value) = attr.config.lock().await.armoury_settings.get(&name) {
-                    attr.attr
-                        .set_current_value(&AttrValue::Integer(*saved_value))
-                        .map_err(|e| {
-                            error!("Could not set {} value: {e:?}", attr.attr.name());
-                            e
-                        })?;
-                    info!(
-                        "Restored armoury setting {} to {:?}",
-                        attr.attr.name(),
-                        saved_value
-                    );
-                }
+            } else if let Some(saved_value) = attr.config.lock().await.armoury_settings.get(&name) {
+                attr.attr
+                    .set_current_value(&AttrValue::Integer(*saved_value))
+                    .map_err(|e| {
+                        error!("Could not set {} value: {e:?}", attr.attr.name());
+                        e
+                    })?;
+                info!(
+                    "Restored armoury setting {} to {:?}",
+                    attr.attr.name(),
+                    saved_value
+                );
             }
 
             registry.push(registry_attr);

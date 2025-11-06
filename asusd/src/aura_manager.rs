@@ -96,14 +96,17 @@ pub struct AsusDevice {
     hid_key: Option<String>,
 }
 
+/// Shared alias for the HidRaw handle map used throughout this module.
+type HidHandleMap = Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>;
+
 pub struct DeviceManager {
     _dbus_connection: Connection,
-    _hid_handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
+    _hid_handles: HidHandleMap,
 }
 
 impl DeviceManager {
     async fn get_or_create_hid_handle(
-        handles: &Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
+        handles: &HidHandleMap,
         endpoint: &Device,
     ) -> Result<(Arc<Mutex<HidRaw>>, String), RogError> {
         let dev_node = endpoint
@@ -124,7 +127,7 @@ impl DeviceManager {
     async fn init_hid_devices(
         connection: &Connection,
         device: Device,
-        handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
+        handles: HidHandleMap,
     ) -> Result<Vec<AsusDevice>, RogError> {
         let mut devices = Vec::new();
         if let Some(usb_device) = device.parent_with_subsystem_devtype("usb", "usb_device")? {
@@ -212,7 +215,7 @@ impl DeviceManager {
     /// To be called on daemon startup
     async fn init_all_hid(
         connection: &Connection,
-        handles: Arc<Mutex<HashMap<String, Arc<Mutex<HidRaw>>>>>,
+        handles: HidHandleMap,
     ) -> Result<Vec<AsusDevice>, RogError> {
         // track and ensure we use only one hidraw per prod_id
         // let mut interfaces = HashSet::new();

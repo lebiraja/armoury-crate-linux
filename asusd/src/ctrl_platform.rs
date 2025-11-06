@@ -51,6 +51,7 @@ pub struct CtrlPlatform {
 }
 
 impl CtrlPlatform {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         platform: RogPlatform,
         power: AsusPower,

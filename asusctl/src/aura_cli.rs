@@ -180,6 +180,7 @@ pub struct TwoColourSpeed {
     pub zone: AuraZone,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, Options)]
 pub struct MultiZone {
     #[options(help = "print help message")]
@@ -194,6 +195,7 @@ pub struct MultiZone {
     pub colour4: Colour,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, Options)]
 pub struct MultiColourSpeed {
     #[options(help = "print help message")]

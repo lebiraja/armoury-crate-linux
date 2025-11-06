@@ -1184,11 +1184,15 @@ fn print_firmware_attr(attr: &AsusArmouryProxyBlocking) -> Result<(), Box<dyn st
     Ok(())
 }
 
+#[allow(clippy::manual_is_multiple_of)]
 fn handle_armoury_command(cmd: &ArmouryCommand) -> Result<(), Box<dyn std::error::Error>> {
     {
-        if cmd.free.is_empty() || !cmd.free.len().is_multiple_of(2) || cmd.help {
+        // Avoid using `.is_multiple_of(2)` to satisfy the request. Use modulus check
+        // and simplify the boolean expression.
+        let odd_len = cmd.free.len() % 2 != 0;
+        if cmd.free.is_empty() || odd_len || cmd.help {
             const USAGE: &str = "Usage: asusctl platform panel_overdrive 1 nv_dynamic_boost 5";
-            if !(cmd.free.len() % 2 == 0) {
+            if odd_len {
                 println!(
                     "Incorrect number of args, each attribute label must be paired with a setting:"
                 );
