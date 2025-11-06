@@ -164,7 +164,26 @@ impl LedSupportFile {
             return Some(data);
         }
 
-        warn!("Does {} exist?", ASUS_LED_MODE_USER_CONF);
+        // If the system-wide support files were not available (e.g. running
+        // tests in CI or a development environment) try to load the
+        // bundled test data shipped with the crate under `data/aura_support.ron`.
+        // This allows unit tests to run without requiring files to be installed
+        // to `/usr/share/asusd`.
+        let mut bundled = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        bundled.push("data/aura_support.ron");
+        if let Ok(buf) = std::fs::read_to_string(&bundled) {
+            if let Ok(mut tmp) = ron::from_str::<LedSupportFile>(&buf) {
+                data.0.append(&mut tmp.0);
+                data.0.sort_by(|a, b| a.device_name.cmp(&b.device_name));
+                info!("Loaded bundled LED support data from {}", bundled.display());
+                return Some(data);
+            } else {
+                warn!("Bundled aura_support.ron present but failed to parse: {}", bundled.display());
+            }
+        } else {
+            warn!("Does {} exist?", ASUS_LED_MODE_USER_CONF);
+        }
+
         None
     }
 }
