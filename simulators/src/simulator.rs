@@ -158,7 +158,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     canvas.set_draw_color(Color::RGB(*b, *b, *b));
 
                     let x: i32 = w + x_count as i32 * w
-                        - if !((y_count + y_offset as usize) % 2 == 0) {
+                        - if (y_count + y_offset as usize) % 2 != 0 {
                             0
                         } else {
                             w / 2
