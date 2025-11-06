@@ -157,13 +157,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 for (x_count, b) in dev.buffer[start..=end].iter().enumerate() {
                     canvas.set_draw_color(Color::RGB(*b, *b, *b));
 
-                    let x: i32 = w + x_count as i32 * w
-                        - if (y_count + y_offset as usize) % 2 != 0 {
+                    let x: i32 = w + x_count as i32 * w - {
+                        #[allow(clippy::manual_is_multiple_of)]
+                        if (y_count + y_offset as usize) % 2 != 0 {
                             0
                         } else {
                             w / 2
                         }
-                        + row.3 * w;
+                    } + row.3 * w;
                     let y = y_count as i32 * h - y_offset * h;
                     canvas
                         .fill_rect(Rect::new(x, y, w as u32, h as u32))
