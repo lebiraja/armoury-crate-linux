@@ -77,11 +77,14 @@ async fn start_daemon() -> Result<(), Box<dyn Error>> {
     let power = AsusPower::new()?; // TODO: maybe needs async mutex?
     let attributes = FirmwareAttributes::new();
     let armoury_registry = match start_attributes_zbus(
-        &server,
+        Some(&server),
         platform.clone(),
         power.clone(),
         attributes.clone(),
         config.clone(),
+        true,
+        None,
+        None,
     )
     .await
     {

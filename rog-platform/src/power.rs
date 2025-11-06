@@ -106,3 +106,13 @@ impl AsusPower {
         ))
     }
 }
+
+impl Default for AsusPower {
+    fn default() -> Self {
+        Self {
+            mains: PathBuf::from("/this_shouldNeVErr_exisid"),
+            battery: PathBuf::from("/this_shouldNeVErr_exisid"),
+            usb: None,
+        }
+    }
+}

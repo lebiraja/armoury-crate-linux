@@ -146,6 +146,14 @@ impl ArmouryAttributeRegistry {
         self.attrs.push(attr);
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.attrs.is_empty()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, AsusArmouryAttribute> {
+        self.attrs.iter()
+    }
+
     pub async fn emit_limits(&self, connection: &Connection) -> Result<(), RogError> {
         let mut last_err: Option<RogError> = None;
         for attr in &self.attrs {
@@ -517,11 +525,14 @@ impl AsusArmouryAttribute {
 }
 
 pub async fn start_attributes_zbus(
-    conn: &Connection,
+    conn: Option<&Connection>,
     platform: RogPlatform,
     power: AsusPower,
     attributes: FirmwareAttributes,
     config: Arc<Mutex<Config>>,
+    enable_zbus: bool,
+    profile_override: Option<rog_platform::platform::PlatformProfile>,
+    power_plugged_override: Option<bool>,
 ) -> Result<ArmouryAttributeRegistry, RogError> {
     let mut registry = ArmouryAttributeRegistry::default();
     for attr in attributes.attributes() {
@@ -534,35 +545,117 @@ pub async fn start_attributes_zbus(
 
         let registry_attr = attr.clone();
 
-        if let Err(e) = attr.reload().await {
-            error!(
-                "Skipping attribute '{}' due to reload error: {e:?}",
-                attr.attr.name()
-            );
-            // continue with others
-            continue;
+        // Only perform the full reload (which may query the platform/power sysfs)
+        // when zbus is enabled. Tests using the no-zbus mode skip the reload and
+        // emulate the reload/apply behavior to avoid depending on udev/sysfs.
+        if enable_zbus {
+            if let Err(e) = attr.reload().await {
+                error!(
+                    "Skipping attribute '{}' due to reload error: {e:?}",
+                    attr.attr.name()
+                );
+                // continue with others
+                continue;
+            }
         }
 
         let attr_name = attr.attribute_name();
 
-        let path = dbus_path_for_attr(attr_name.as_str());
-        match zbus::object_server::SignalEmitter::new(conn, path) {
-            Ok(sig) => {
-                if let Err(e) = attr.watch_and_notify(sig).await {
-                    error!("Failed to start watcher for '{}': {e:?}", attr.attr.name());
+        // If zbus is enabled and a connection is provided, create the SignalEmitter,
+        // start watchers and register the object on zbus. Tests can call this function
+        // with enable_zbus=false and conn=None to skip DBus registration and watchers.
+        if !enable_zbus {
+            // Emulate reload logic but prefer overrides when provided to avoid dependency on udev/sysfs in tests
+            let name: rog_platform::asus_armoury::FirmwareAttribute = attr.attr.name().into();
+            if name.is_ppt() || name.is_dgpu() {
+                // determine profile
+                let profile = if let Some(p) = profile_override {
+                    p
+                } else {
+                    match attr.platform.get_platform_profile() {
+                        Ok(p) => p.into(),
+                        Err(_) => rog_platform::platform::PlatformProfile::Balanced,
+                    }
+                };
+
+                // determine power plugged
+                let power_plugged = if let Some(v) = power_plugged_override {
+                    v
+                } else {
+                    match attr.power.get_online() {
+                        Ok(v) => v == 1,
+                        Err(_) => false,
+                    }
+                };
+
+                let apply_value = {
+                    let config = attr.config.lock().await;
+                    config
+                        .select_tunings_ref(power_plugged, profile)
+                        .and_then(|tuning| {
+                            if tuning.enabled {
+                                tuning.group.get(&attr.name()).copied()
+                            } else {
+                                None
+                            }
+                        })
+                };
+
+                if let Some(tune) = apply_value {
+                    attr.attr
+                        .set_current_value(&AttrValue::Integer(tune))
+                        .map_err(|e| {
+                            error!("Could not set {} value: {e:?}", attr.attr.name());
+                            e
+                        })?;
+                }
+            } else {
+                if let Some(saved_value) = attr.config.lock().await.armoury_settings.get(&name) {
+                    attr.attr
+                        .set_current_value(&AttrValue::Integer(*saved_value))
+                        .map_err(|e| {
+                            error!("Could not set {} value: {e:?}", attr.attr.name());
+                            e
+                        })?;
+                    info!(
+                        "Restored armoury setting {} to {:?}",
+                        attr.attr.name(),
+                        saved_value
+                    );
                 }
             }
-            Err(e) => {
-                error!(
-                    "Failed to create SignalEmitter for '{}': {e:?}",
-                    attr.attr.name()
-                );
-            }
+
+            registry.push(registry_attr);
+            continue;
         }
 
-        if let Err(e) = attr.move_to_zbus(conn).await {
-            error!("Failed to register attribute '{attr_name}' on zbus: {e:?}");
-            continue;
+        // If zbus is enabled and a connection is provided, create the SignalEmitter,
+        // start watchers and register the object on zbus. Tests can call this function
+        // with enable_zbus=false and conn=None to skip DBus registration and watchers.
+        if enable_zbus {
+            if let Some(connection) = conn {
+                let path = dbus_path_for_attr(attr_name.as_str());
+                match zbus::object_server::SignalEmitter::new(connection, path) {
+                    Ok(sig) => {
+                        if let Err(e) = attr.watch_and_notify(sig).await {
+                            error!("Failed to start watcher for '{}': {e:?}", attr.attr.name());
+                        }
+                    }
+                    Err(e) => {
+                        error!(
+                            "Failed to create SignalEmitter for '{}': {e:?}",
+                            attr.attr.name()
+                        );
+                    }
+                }
+
+                if let Err(e) = attr.move_to_zbus(connection).await {
+                    error!("Failed to register attribute '{attr_name}' on zbus: {e:?}");
+                    continue;
+                }
+            } else {
+                error!("zbus enabled but no Connection provided for attribute registration");
+            }
         }
 
         registry.push(registry_attr);

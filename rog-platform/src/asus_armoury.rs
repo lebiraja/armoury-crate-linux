@@ -394,6 +394,7 @@ impl FirmwareAttribute {
             self,
             FirmwareAttribute::NvDynamicBoost
                 | FirmwareAttribute::NvTempTarget
+                | FirmwareAttribute::DgpuBaseTgp
                 | FirmwareAttribute::DgpuTgp
         )
     }
