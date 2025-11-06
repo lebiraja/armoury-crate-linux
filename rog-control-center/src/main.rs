@@ -153,6 +153,9 @@ async fn main() -> Result<()> {
     let startup_in_background = config.startup_in_background;
     let config = Arc::new(Mutex::new(config));
 
+    // shared weak handle to the UI so other threads can request UI updates
+    let ui_handle: Arc<Mutex<Option<slint::Weak<MainWindow>>>> = Arc::new(Mutex::new(None));
+
     start_notifications(config.clone(), &rt)?;
 
     if enable_tray_icon {
@@ -177,12 +180,14 @@ async fn main() -> Result<()> {
         slint::init_translations!(concat!(env!("CARGO_MANIFEST_DIR"), "/translations/"));
     }
 
+    let config_for_ui = config.clone();
+    let ui_handle_for_thread = ui_handle.clone();
     thread::spawn(move || {
         let mut state = AppState::StartingUp;
         loop {
             if is_rog_ally {
-                let config_copy_2 = config.clone();
-                let newui = setup_window(config.clone());
+                let config_copy_2 = config_for_ui.clone();
+                let newui = setup_window(config_for_ui.clone());
                 newui.window().on_close_requested(move || {
                     exit(0);
                 });
@@ -218,13 +223,19 @@ async fn main() -> Result<()> {
                         *app_state = AppState::MainWindowOpen;
                     }
 
-                    let config_copy = config.clone();
+                    let config_copy = config_for_ui.clone();
                     let app_state_copy = app_state.clone();
+                    let ui_handle_for_ui = ui_handle_for_thread.clone();
                     slint::invoke_from_event_loop(move || {
+                        let ui_handle_for_ui = ui_handle_for_ui.clone();
                         UI.with(|ui| {
                             let app_state_copy = app_state_copy.clone();
                             let mut ui = ui.borrow_mut();
                             if let Some(ui) = ui.as_mut() {
+                                // store weak handle so other threads can update UI globals
+                                if let Ok(mut h) = ui_handle_for_ui.lock() {
+                                    *h = Some(ui.as_weak());
+                                }
                                 ui.window().show().unwrap();
                                 ui.window().on_close_requested(move || {
                                     if let Ok(mut app_state) = app_state_copy.lock() {
@@ -235,6 +246,10 @@ async fn main() -> Result<()> {
                             } else {
                                 let config_copy_2 = config_copy.clone();
                                 let newui = setup_window(config_copy);
+                                // store weak handle for the newly created UI
+                                if let Ok(mut h) = ui_handle_for_ui.lock() {
+                                    *h = Some(newui.as_weak());
+                                }
                                 newui.window().on_close_requested(move || {
                                     if let Ok(mut app_state) = app_state_copy.lock() {
                                         *app_state = AppState::MainWindowClosed;
@@ -270,8 +285,8 @@ async fn main() -> Result<()> {
                     slint::quit_event_loop().unwrap();
                     exit(0);
                 } else if state != AppState::MainWindowOpen {
-                    if let Ok(config) = config.lock() {
-                        if !config.run_in_background {
+                    if let Ok(cfg) = config_for_ui.lock() {
+                        if !cfg.run_in_background {
                             slint::quit_event_loop().unwrap();
                             exit(0);
                         }
@@ -281,9 +296,65 @@ async fn main() -> Result<()> {
         }
     });
 
+    // start config watcher to pick up external edits
+    spawn_config_watcher(config.clone(), ui_handle.clone());
+
     slint::run_event_loop_until_quit().unwrap();
     rt.shutdown_background();
     Ok(())
+}
+
+// Spawn a watcher thread that polls the config file and reloads it when modified.
+// This keeps the running rogcc instance in sync with manual edits to the config file.
+fn spawn_config_watcher(
+    config: Arc<Mutex<Config>>,
+    ui_handle: Arc<Mutex<Option<slint::Weak<MainWindow>>>>,
+) {
+    std::thread::spawn(move || {
+        use std::time::SystemTime;
+        let cfg_path = Config::config_dir().join(Config::new().file_name());
+        let mut last_mtime: Option<SystemTime> = None;
+        loop {
+            if let Ok(meta) = std::fs::metadata(&cfg_path) {
+                if let Ok(m) = meta.modified() {
+                    if last_mtime.is_none() {
+                        last_mtime = Some(m);
+                    } else if last_mtime.is_some_and(|t| t < m) {
+                        // file changed, reload
+                        last_mtime = Some(m);
+                        let new_cfg = Config::new().load();
+                        if let Ok(mut lock) = config.lock() {
+                            *lock = new_cfg.clone();
+                        }
+
+                        // Update UI app settings globals if UI is present
+                        if let Ok(maybe_weak) = ui_handle.lock() {
+                            if let Some(weak) = maybe_weak.clone() {
+                                let config_for_ui = config.clone();
+                                weak.upgrade_in_event_loop(move |w| {
+                                    if let Ok(lock) = config_for_ui.lock() {
+                                        let cfg = lock.clone();
+                                        w.global::<rog_control_center::AppSettingsPageData>()
+                                            .set_run_in_background(cfg.run_in_background);
+                                        w.global::<rog_control_center::AppSettingsPageData>()
+                                            .set_startup_in_background(cfg.startup_in_background);
+                                        w.global::<rog_control_center::AppSettingsPageData>()
+                                            .set_enable_tray_icon(cfg.enable_tray_icon);
+                                        w.global::<rog_control_center::AppSettingsPageData>()
+                                            .set_enable_dgpu_notifications(
+                                                cfg.notifications.enabled,
+                                            );
+                                    }
+                                })
+                                .ok();
+                            }
+                        }
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+    });
 }
 
 fn do_cli_help(parsed: &CliStart) -> bool {

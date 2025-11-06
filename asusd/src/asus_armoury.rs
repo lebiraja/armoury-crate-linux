@@ -27,6 +27,28 @@ fn dbus_path_for_attr(attr_name: &str) -> OwnedObjectPath {
     ObjectPath::from_str_unchecked(&format!("{ASUS_ZBUS_PATH}/{MOD_NAME}/{attr_name}")).into()
 }
 
+// Helper: return true when the attribute is effectively unsupported for
+// the current power mode/device. We consider an attribute unsupported when
+// its resolved min and max are equal (no available range), which indicates
+// writes would be invalid. When true, callers should avoid attempting writes.
+fn attr_unsupported(attr: &Attribute) -> bool {
+    let min = attr
+        .refresh_min_value()
+        .or(match attr.min_value() {
+            AttrValue::Integer(i) => Some(*i),
+            _ => None,
+        })
+        .unwrap_or(-1);
+    let max = attr
+        .refresh_max_value()
+        .or(match attr.max_value() {
+            AttrValue::Integer(i) => Some(*i),
+            _ => None,
+        })
+        .unwrap_or(-2); // different default so equality is false unless both present
+    min == max
+}
+
 #[derive(Clone)]
 pub struct AsusArmouryAttribute {
     attr: Attribute,
@@ -204,14 +226,24 @@ impl crate::Reloadable for AsusArmouryAttribute {
             };
 
             if let Some(tune) = apply_value {
-                self.attr
-                    .set_current_value(&AttrValue::Integer(tune))
-                    .map_err(|e| {
-                        error!("Could not set {} value: {e:?}", self.attr.name());
-                        self.attr.base_path_exists();
-                        e
-                    })?;
-                info!("Set {} to {:?}", self.attr.name(), tune);
+                // Don't attempt writes for attributes that report min==0 and max==0
+                // (commonly means not supported in this power mode/device); skip
+                // applying stored tune in that case.
+                if self.attr.base_path_exists() && !attr_unsupported(&self.attr) {
+                    self.attr
+                        .set_current_value(&AttrValue::Integer(tune))
+                        .map_err(|e| {
+                            error!("Could not set {} value: {e:?}", self.attr.name());
+                            self.attr.base_path_exists();
+                            e
+                        })?;
+                    info!("Set {} to {:?}", self.attr.name(), tune);
+                } else {
+                    debug!(
+                        "Skipping apply for {} because attribute missing or unsupported (min==max)",
+                        self.attr.name()
+                    );
+                }
             }
         } else {
             // Handle non-PPT attributes (boolean and other settings)
@@ -442,13 +474,23 @@ impl AsusArmouryAttribute {
                 .unwrap_or_default()
                 != 0;
 
-            if power_plugged == on_ac {
-                self.attr
-                    .set_current_value(&AttrValue::Integer(value))
-                    .map_err(|e| {
-                        error!("Could not set value: {e:?}");
-                        e
-                    })?;
+            // Don't attempt writes for attributes that report min==0 and max==0
+            // (commonly means not supported in this power mode/device); skip
+            // applying stored value in that case.
+            if self.attr.base_path_exists() && !attr_unsupported(&self.attr) {
+                if power_plugged == on_ac {
+                    self.attr
+                        .set_current_value(&AttrValue::Integer(value))
+                        .map_err(|e| {
+                            error!("Could not set value: {e:?}");
+                            e
+                        })?;
+                }
+            } else {
+                debug!(
+                    "Skipping immediate apply for {} because attribute missing or unsupported (min==max)",
+                    self.attr.name()
+                );
             }
         }
 
@@ -478,12 +520,22 @@ impl AsusArmouryAttribute {
                 debug!("Store tuning config for {} = {:?}", self.attr.name(), value);
             }
             if tuning.enabled {
-                self.attr
-                    .set_current_value(&AttrValue::Integer(value))
-                    .map_err(|e| {
-                        error!("Could not set value: {e:?}");
-                        e
-                    })?;
+                // Don't attempt writes for attributes that report min==0 and max==0
+                // (commonly means not supported in this power mode/device); skip
+                // applying stored value in that case.
+                if self.attr.base_path_exists() && !attr_unsupported(&self.attr) {
+                    self.attr
+                        .set_current_value(&AttrValue::Integer(value))
+                        .map_err(|e| {
+                            error!("Could not set value: {e:?}");
+                            e
+                        })?;
+                } else {
+                    debug!(
+                        "Skipping apply for {} on set_current_value because attribute missing or unsupported (min==max)",
+                        self.attr.name()
+                    );
+                }
             }
         } else {
             self.attr
@@ -676,28 +728,44 @@ pub async fn set_config_or_default(
                 debug!("Tuning group is not enabled, skipping");
                 return;
             }
-
+            // Determine once whether attribute is present and supports a writable range
+            let supported = attr.base_path_exists() && !attr_unsupported(attr);
             if let Some(tune) = tuning.group.get(&name) {
-                attr.set_current_value(&AttrValue::Integer(*tune))
-                    .map_err(|e| {
-                        error!("Failed to set {}: {e}", <&str>::from(name));
-                    })
-                    .ok();
-            } else {
-                let default = attr.default_value();
-                attr.set_current_value(default)
-                    .map_err(|e| {
-                        error!("Failed to set {}: {e}", <&str>::from(name));
-                    })
-                    .ok();
-                if let AttrValue::Integer(i) = default {
-                    tuning.group.insert(name, *i);
-                    info!(
-                        "Set default tuning config for {} = {:?}",
-                        <&str>::from(name),
-                        i
+                if supported {
+                    attr.set_current_value(&AttrValue::Integer(*tune))
+                        .map_err(|e| {
+                            error!("Failed to set {}: {e}", <&str>::from(name));
+                        })
+                        .ok();
+                } else {
+                    debug!(
+                        "Skipping apply for {} in set_config_or_default because attribute missing or unsupported",
+                        <&str>::from(name)
                     );
-                    // config.write();
+                }
+            } else {
+                // Only attempt to apply defaults when the attribute supports a range
+                if supported {
+                    let default = attr.default_value();
+                    attr.set_current_value(default)
+                        .map_err(|e| {
+                            error!("Failed to set {}: {e}", <&str>::from(name));
+                        })
+                        .ok();
+                    if let AttrValue::Integer(i) = default {
+                        tuning.group.insert(name, *i);
+                        info!(
+                            "Set default tuning config for {} = {:?}",
+                            <&str>::from(name),
+                            i
+                        );
+                        // config.write();
+                    }
+                } else {
+                    debug!(
+                        "Skipping default apply for {} in set_config_or_default because attribute missing or unsupported",
+                        <&str>::from(name)
+                    );
                 }
             }
         } else {
