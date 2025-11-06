@@ -130,6 +130,51 @@ macro_rules! init_minmax_property {
 
 // For handling callbacks from UI value changes
 macro_rules! setup_callback {
+    // Minmax (AttrMinMax) variant - pass an extra `minmax` token
+    ($property:ident, $handle:expr, $attr:expr, $type:tt, minmax) => {
+        let handle_copy = $handle.as_weak();
+        let proxy_copy = $attr.clone();
+        concat_idents!(on_callback = on_cb_, $property {
+            $handle
+                .global::<SystemPageData>()
+                .on_callback(move |v| {
+                    let handle_copy = handle_copy.clone();
+                    let proxy_copy = proxy_copy.clone();
+                    tokio::spawn(async move {
+                        let res = proxy_copy
+                            .set_current_value(convert_to_dbus!($type, v))
+                            .await;
+                        show_toast(
+                            format!("{} successfully set to {}", stringify!($property), v).into(),
+                            format!("Setting {} failed", stringify!($property)).into(),
+                            handle_copy.clone(),
+                            res.clone(),
+                        );
+
+                        if res.is_ok() {
+                            let min_v = proxy_copy.min_value().await.unwrap_or(-1);
+                            let max_v = proxy_copy.max_value().await.unwrap_or(-1);
+                            if let Ok(cur_val) = proxy_copy.current_value().await {
+                                let cur_f = cur_val as f32;
+                                handle_copy
+                                    .upgrade_in_event_loop(move |handle| {
+                                        concat_idents!(setter = set_, $property {
+                                            handle.global::<SystemPageData>().setter(AttrMinMax {
+                                                min: min_v,
+                                                max: max_v,
+                                                current: cur_f,
+                                            });
+                                        });
+                                    })
+                                    .ok();
+                            }
+                        }
+                    });
+                });
+        });
+    };
+
+    // Scalar variant (i32/bool/f32) - update scalar setter with authoritative value
     ($property:ident, $handle:expr, $attr:expr, $type:tt) => {
         let handle_copy = $handle.as_weak();
         let proxy_copy = $attr.clone();
@@ -140,12 +185,28 @@ macro_rules! setup_callback {
                     let handle_copy = handle_copy.clone();
                     let proxy_copy = proxy_copy.clone();
                     tokio::spawn(async move {
+                        let res = proxy_copy
+                            .set_current_value(convert_to_dbus!($type, v))
+                            .await;
                         show_toast(
                             format!("{} successfully set to {}", stringify!($property), v).into(),
                             format!("Setting {} failed", stringify!($property)).into(),
-                            handle_copy,
-                            proxy_copy.set_current_value(convert_to_dbus!($type, v)).await,
+                            handle_copy.clone(),
+                            res.clone(),
                         );
+
+                        if res.is_ok() {
+                            // Query authoritative value and set scalar global
+                            if let Ok(cur_val) = proxy_copy.current_value().await {
+                                handle_copy.upgrade_in_event_loop(move |handle| {
+                                    concat_idents!(setter = set_, $property {
+                                        handle
+                                            .global::<SystemPageData>()
+                                            .setter(convert_value!($type, cur_val));
+                                    });
+                                }).ok();
+                            }
+                        }
                     });
                 });
         });
@@ -615,49 +676,49 @@ pub fn setup_system_page_callbacks(ui: &MainWindow, _states: Arc<Mutex<Config>>)
                             }
                             FirmwareAttribute::PptPl1Spl => {
                                 init_minmax_property!(ppt_pl1_spl, handle, attr);
-                                setup_callback!(ppt_pl1_spl, handle, attr, i32);
+                                setup_callback!(ppt_pl1_spl, handle, attr, i32, minmax);
                                 setup_callback_restore_default!(ppt_pl1_spl, handle, attr);
                                 setup_minmax_external!(ppt_pl1_spl, handle, attr, platform);
                             }
                             FirmwareAttribute::PptPl2Sppt => {
                                 init_minmax_property!(ppt_pl2_sppt, handle, attr);
-                                setup_callback!(ppt_pl2_sppt, handle, attr, i32);
+                                setup_callback!(ppt_pl2_sppt, handle, attr, i32, minmax);
                                 setup_callback_restore_default!(ppt_pl2_sppt, handle, attr);
                                 setup_minmax_external!(ppt_pl2_sppt, handle, attr, platform);
                             }
                             FirmwareAttribute::PptPl3Fppt => {
                                 init_minmax_property!(ppt_pl3_fppt, handle, attr);
-                                setup_callback!(ppt_pl3_fppt, handle, attr, i32);
+                                setup_callback!(ppt_pl3_fppt, handle, attr, i32, minmax);
                                 setup_callback_restore_default!(ppt_pl3_fppt, handle, attr);
                                 setup_minmax_external!(ppt_pl3_fppt, handle, attr, platform);
                             }
                             FirmwareAttribute::PptFppt => {
                                 init_minmax_property!(ppt_fppt, handle, attr);
-                                setup_callback!(ppt_fppt, handle, attr, i32);
+                                setup_callback!(ppt_fppt, handle, attr, i32, minmax);
                                 setup_callback_restore_default!(ppt_fppt, handle, attr);
                                 setup_minmax_external!(ppt_fppt, handle, attr, platform);
                             }
                             FirmwareAttribute::PptApuSppt => {
                                 init_minmax_property!(ppt_apu_sppt, handle, attr);
-                                setup_callback!(ppt_apu_sppt, handle, attr, i32);
+                                setup_callback!(ppt_apu_sppt, handle, attr, i32, minmax);
                                 setup_callback_restore_default!(ppt_apu_sppt, handle, attr);
                                 setup_minmax_external!(ppt_apu_sppt, handle, attr, platform);
                             }
                             FirmwareAttribute::PptPlatformSppt => {
                                 init_minmax_property!(ppt_platform_sppt, handle, attr);
-                                setup_callback!(ppt_platform_sppt, handle, attr, i32);
+                                setup_callback!(ppt_platform_sppt, handle, attr, i32, minmax);
                                 setup_callback_restore_default!(ppt_platform_sppt, handle, attr);
                                 setup_minmax_external!(ppt_platform_sppt, handle, attr, platform);
                             }
                             FirmwareAttribute::NvDynamicBoost => {
                                 init_minmax_property!(nv_dynamic_boost, handle, attr);
-                                setup_callback!(nv_dynamic_boost, handle, attr, i32);
+                                setup_callback!(nv_dynamic_boost, handle, attr, i32, minmax);
                                 setup_callback_restore_default!(nv_dynamic_boost, handle, attr);
                                 setup_minmax_external!(nv_dynamic_boost, handle, attr, platform);
                             }
                             FirmwareAttribute::NvTempTarget => {
                                 init_minmax_property!(nv_temp_target, handle, attr);
-                                setup_callback!(nv_temp_target, handle, attr, i32);
+                                setup_callback!(nv_temp_target, handle, attr, i32, minmax);
                                 setup_callback_restore_default!(nv_temp_target, handle, attr);
                                 setup_minmax_external!(nv_temp_target, handle, attr, platform);
                             }
