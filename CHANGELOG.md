@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+- tie nv_ properties to power profiles
+- Better support nv_tgp
+
 ## [v6.1.17]
 
 ### Changed
