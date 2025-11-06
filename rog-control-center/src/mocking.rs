@@ -117,6 +117,14 @@ impl Bios {
     pub fn set_nv_temp_target(&self, _v: i16) -> Result<()> {
         Ok(())
     }
+
+    pub fn nv_tgp(&self) -> Result<i16> {
+        Ok(0)
+    }
+
+    pub fn set_nv_tgp(&self, _v: i16) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub struct Profile;

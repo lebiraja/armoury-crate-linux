@@ -225,6 +225,8 @@ pub struct Config601 {
     pub nv_dynamic_boost: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub nv_temp_target: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub nv_tgp: Option<u8>,
     #[serde(skip)]
     pub last_power_plugged: u8,
 }

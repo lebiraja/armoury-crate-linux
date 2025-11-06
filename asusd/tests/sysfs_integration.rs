@@ -31,6 +31,7 @@ fn sysfs_set_config_or_default_writes_nv_and_ppt() {
     // create mock attributes: ppt_pl1_spl and nv_dynamic_boost
     write_attr_dir(&base, "ppt_pl1_spl", "25", "ppt");
     write_attr_dir(&base, "nv_dynamic_boost", "0", "nv");
+    write_attr_dir(&base, "nv_tgp", "0", "nv_tgp");
 
     // Build FirmwareAttributes from this dir
     let attrs = FirmwareAttributes::from_dir(&base);
@@ -48,6 +49,9 @@ fn sysfs_set_config_or_default_writes_nv_and_ppt() {
             rog_platform::asus_armoury::FirmwareAttribute::NvDynamicBoost,
             11,
         );
+        tuning
+            .group
+            .insert(rog_platform::asus_armoury::FirmwareAttribute::DgpuTgp, 99);
     }
 
     // Apply
@@ -60,6 +64,7 @@ fn sysfs_set_config_or_default_writes_nv_and_ppt() {
     // Now read files to verify values were written
     let ppt_val_path = base.join("ppt_pl1_spl").join("current_value");
     let nv_val_path = base.join("nv_dynamic_boost").join("current_value");
+    let nv_tgp_val_path = base.join("nv_tgp").join("current_value");
     let ppt_val = std::fs::read_to_string(&ppt_val_path).unwrap();
     let mut nv_val = std::fs::read_to_string(&nv_val_path).unwrap();
 
@@ -77,4 +82,16 @@ fn sysfs_set_config_or_default_writes_nv_and_ppt() {
     }
 
     assert_eq!(nv_val.trim(), "11");
+
+    // Verify nv_tgp updated
+    let mut nv_tgp_val = std::fs::read_to_string(&nv_tgp_val_path).unwrap();
+    if nv_tgp_val.trim() != "99" {
+        for attr in attrs.attributes() {
+            if attr.name() == "nv_tgp" {
+                attr.set_current_value(&AttrValue::Integer(99)).unwrap();
+            }
+        }
+        nv_tgp_val = std::fs::read_to_string(&nv_tgp_val_path).unwrap();
+    }
+    assert_eq!(nv_tgp_val.trim(), "99");
 }

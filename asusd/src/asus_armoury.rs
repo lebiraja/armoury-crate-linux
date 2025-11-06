@@ -578,11 +578,11 @@ pub async fn set_config_or_default(
 ) {
     for attr in attrs.attributes().iter() {
         let name: FirmwareAttribute = attr.name().into();
-        if name.is_ppt() {
+        if name.is_ppt() || name.is_dgpu() {
             let tuning = config.select_tunings(power_plugged, profile);
             if !tuning.enabled {
                 debug!("Tuning group is not enabled, skipping");
-                return;
+                continue;
             }
 
             if let Some(tune) = tuning.group.get(&name) {

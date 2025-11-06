@@ -95,7 +95,7 @@ impl Attribute {
             _ => return Err(PlatformError::InvalidValue),
         };
 
-        let mut file = OpenOptions::new().write(true).open(&path)?;
+        let mut file = OpenOptions::new().write(true).truncate(true).open(&path)?;
         file.write_all(value_str.as_bytes())?;
         Ok(())
     }
@@ -313,8 +313,8 @@ define_attribute_getters!(
     ppt_fppt,
     nv_dynamic_boost,
     nv_temp_target,
-    dgpu_base_tgp,
-    dgpu_tgp,
+    nv_base_tgp,
+    nv_tgp,
     charge_mode,
     boot_sound,
     mcu_powersave,
@@ -331,6 +331,7 @@ define_attribute_getters!(
 /// CamelCase names of the properties. Intended for use with DBUS
 #[repr(u8)]
 #[derive(
+    Debug,
     Clone,
     Copy,
     Serialize,
@@ -413,8 +414,11 @@ impl From<&str> for FirmwareAttribute {
             "ppt_platform_sppt" => Self::PptPlatformSppt,
             "nv_dynamic_boost" => Self::NvDynamicBoost,
             "nv_temp_target" => Self::NvTempTarget,
+            "nv_tgp" => Self::DgpuTgp,
             "nv_base_tgp" => Self::DgpuBaseTgp,
+            /* Backwards compatibility: some kernels expose these attributes with a dgpu_* prefix */
             "dgpu_tgp" => Self::DgpuTgp,
+            "dgpu_base_tgp" => Self::DgpuBaseTgp,
             "charge_mode" => Self::ChargeMode,
             "boot_sound" => Self::BootSound,
             "mcu_powersave" => Self::McuPowersave,
@@ -450,8 +454,8 @@ impl From<FirmwareAttribute> for &str {
             FirmwareAttribute::PptPlatformSppt => "ppt_platform_sppt",
             FirmwareAttribute::NvDynamicBoost => "nv_dynamic_boost",
             FirmwareAttribute::NvTempTarget => "nv_temp_target",
-            FirmwareAttribute::DgpuBaseTgp => "dgpu_base_tgp",
-            FirmwareAttribute::DgpuTgp => "dgpu_tgp",
+            FirmwareAttribute::DgpuBaseTgp => "nv_base_tgp",
+            FirmwareAttribute::DgpuTgp => "nv_tgp",
             FirmwareAttribute::ChargeMode => "charge_mode",
             FirmwareAttribute::BootSound => "boot_sound",
             FirmwareAttribute::McuPowersave => "mcu_powersave",
@@ -548,5 +552,30 @@ mod tests {
             *val = 0;
         }
         attr.set_current_value(&val).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod alias_tests {
+    use super::FirmwareAttribute;
+
+    #[test]
+    fn tgp_aliases_map_to_same_variant() {
+        let nv = FirmwareAttribute::from("nv_tgp");
+        let dgpu = FirmwareAttribute::from("dgpu_tgp");
+        assert_eq!(nv, dgpu);
+
+        let nv_base = FirmwareAttribute::from("nv_base_tgp");
+        let dgpu_base = FirmwareAttribute::from("dgpu_base_tgp");
+        assert_eq!(nv_base, dgpu_base);
+    }
+
+    #[test]
+    fn tgp_canonical_output_is_nv_tgp() {
+        let s: &str = FirmwareAttribute::DgpuTgp.into();
+        assert_eq!(s, "nv_tgp");
+
+        let s_base: &str = FirmwareAttribute::DgpuBaseTgp.into();
+        assert_eq!(s_base, "nv_base_tgp");
     }
 }
