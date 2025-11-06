@@ -24,4 +24,6 @@ pub struct CliStart {
                 that might match your laptop"
     )]
     pub layout_viewing: bool,
+    #[options(help = "start in tray mode - main window hidden")]
+    pub tray_mode: bool,
 }

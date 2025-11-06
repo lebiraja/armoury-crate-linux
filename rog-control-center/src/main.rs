@@ -140,6 +140,13 @@ async fn main() -> Result<()> {
         config.startup_in_background = false;
         config.start_fullscreen = true;
     }
+
+    if cli_parsed.tray_mode {
+        config.enable_tray_icon = true;
+        config.run_in_background = true;
+        config.startup_in_background = true;
+    }
+
     config.write();
 
     let enable_tray_icon = config.enable_tray_icon;

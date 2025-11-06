@@ -178,7 +178,10 @@ impl LedSupportFile {
                 info!("Loaded bundled LED support data from {}", bundled.display());
                 return Some(data);
             } else {
-                warn!("Bundled aura_support.ron present but failed to parse: {}", bundled.display());
+                warn!(
+                    "Bundled aura_support.ron present but failed to parse: {}",
+                    bundled.display()
+                );
             }
         } else {
             warn!("Does {} exist?", ASUS_LED_MODE_USER_CONF);
