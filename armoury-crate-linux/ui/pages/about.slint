@@ -1,0 +1,140 @@
+// About page - Shows version and project information
+
+import { RogTheme } from "../theme.slint";
+
+export component PageAbout inherits Rectangle {
+    background: RogTheme.bg-primary;
+
+    VerticalLayout {
+        padding: RogTheme.spacing-lg;
+        spacing: RogTheme.spacing-lg;
+        alignment: start;
+
+        // Header
+        Text {
+            text: "About";
+            font-size: RogTheme.font-size-h1;
+            font-weight: 700;
+            color: RogTheme.text-primary;
+        }
+
+        // Content card
+        Rectangle {
+            background: RogTheme.bg-card;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            VerticalLayout {
+                padding: RogTheme.spacing-xl;
+                spacing: RogTheme.spacing-lg;
+
+                // Title
+                VerticalLayout {
+                    spacing: RogTheme.spacing-xs;
+
+                    Text {
+                        text: "ARMOURY CRATE LINUX";
+                        font-size: RogTheme.font-size-h2;
+                        font-weight: 700;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "Gaming-focused control center for ASUS ROG laptops";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+
+                // Separator
+                Rectangle {
+                    height: 1px;
+                    background: RogTheme.border-default;
+                }
+
+                // Description
+                Text {
+                    text: "This application provides a Linux-native equivalent to ASUS Armoury Crate, " +
+                          "offering system monitoring, performance profiles, RGB keyboard control, " +
+                          "and more for ASUS ROG laptops.";
+                    font-size: RogTheme.font-size-body;
+                    color: RogTheme.text-secondary;
+                    wrap: word-wrap;
+                }
+
+                // Features list
+                VerticalLayout {
+                    spacing: RogTheme.spacing-sm;
+
+                    Text {
+                        text: "Features:";
+                        font-size: RogTheme.font-size-lg;
+                        font-weight: 600;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "• Real-time system monitoring dashboard\n" +
+                              "• Platform performance profiles (Balanced, Performance, Quiet)\n" +
+                              "• RGB keyboard control (Aura)\n" +
+                              "• AniMe Matrix display control\n" +
+                              "• Custom fan curves\n" +
+                              "• TDP and power management\n" +
+                              "• Scenario profiles (per-application settings)";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+
+                // Separator
+                Rectangle {
+                    height: 1px;
+                    background: RogTheme.border-default;
+                }
+
+                // Links and info
+                VerticalLayout {
+                    spacing: RogTheme.spacing-sm;
+
+                    Text {
+                        text: "Requirements:";
+                        font-size: RogTheme.font-size-lg;
+                        font-weight: 600;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "• Linux kernel 6.19+ (for asus-armoury driver)\n" +
+                              "• asusd daemon running\n" +
+                              "• ASUS ROG laptop with supported features";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+
+                // Credits
+                VerticalLayout {
+                    spacing: RogTheme.spacing-sm;
+
+                    Text {
+                        text: "Credits:";
+                        font-size: RogTheme.font-size-lg;
+                        font-weight: 600;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "Based on asusctl by Luke Jones and contributors.\n" +
+                              "Part of the asus-linux project.";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+            }
+        }
+
+        // Spacer
+        Rectangle { vertical-stretch: 1; }
+    }
+}

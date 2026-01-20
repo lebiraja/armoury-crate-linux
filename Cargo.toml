@@ -29,6 +29,7 @@ members = [
   "rog-slash",
   "simulators",
   "rog-scsi",
+  "armoury-crate-linux",
 ]
 
 default-members = ["asusctl", "asusd", "asusd-user", "rog-control-center"]

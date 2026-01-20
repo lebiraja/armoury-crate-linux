@@ -1,0 +1,77 @@
+[package]
+name = "armoury-crate-linux"
+description = "Gaming-focused control center for ASUS ROG laptops - Linux equivalent of Armoury Crate"
+license.workspace = true
+version.workspace = true
+readme.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+mocking = []
+x11 = ["slint/backend-winit-x11"]
+nvidia = ["nvml-wrapper"]
+tokio-debug = ["console-subscriber"]
+rog_ally = []
+
+[dependencies]
+console-subscriber = { version = "^0.4", optional = true }
+
+# System tray
+ksni = { version = "0.3", default-features = false, features = ["async-io"] }
+image = "0.25.5"
+
+# System monitoring
+sysinfo = "0.30"
+nvml-wrapper = { version = "0.10", optional = true }
+
+# Reuse existing crates
+asusd = { path = "../asusd" }
+config-traits = { path = "../config-traits" }
+rog_anime = { path = "../rog-anime" }
+rog_dbus = { path = "../rog-dbus" }
+rog_aura = { path = "../rog-aura" }
+rog_profiles = { path = "../rog-profiles" }
+rog_platform = { path = "../rog-platform" }
+supergfxctl = { git = "https://gitlab.com/asus-linux/supergfxctl.git", default-features = false }
+dmi_id = { path = "../dmi-id" }
+
+# Workspace dependencies
+gumdrop.workspace = true
+log.workspace = true
+env_logger.workspace = true
+tokio.workspace = true
+serde.workspace = true
+zbus.workspace = true
+dirs.workspace = true
+notify-rust.workspace = true
+concat-idents.workspace = true
+futures-util.workspace = true
+versions.workspace = true
+
+[dependencies.slint]
+git = "https://github.com/slint-ui/slint.git"
+default-features = false
+features = [
+    "compat-1-2",
+    "gettext",
+    "backend-winit-wayland",
+    "renderer-femtovg",
+]
+
+[build-dependencies.slint-build]
+git = "https://github.com/slint-ui/slint.git"
+
+[package.metadata.deb]
+license-file = ["../LICENSE", "4"]
+extended-description = """\
+Gaming-focused control center for ASUS ROG laptops on Linux."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+  ["target/release/armoury-crate-linux", "usr/bin/", "755"],
+]

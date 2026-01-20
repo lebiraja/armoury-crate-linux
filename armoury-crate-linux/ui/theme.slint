@@ -1,0 +1,92 @@
+// ROG Gaming Theme for Armoury Crate Linux
+// Dark theme with neon accents inspired by ASUS ROG Armoury Crate
+
+// Theme colors and design tokens
+export global RogTheme {
+    // Background colors - Deep dark with slight blue tint
+    out property <color> bg-primary: #0D0F14;
+    out property <color> bg-secondary: #1A1D26;
+    out property <color> bg-tertiary: #252831;
+    out property <color> bg-card: #1E2128;
+    out property <color> bg-hover: #2A2E38;
+
+    // Accent colors - Neon gaming style
+    out property <color> accent-red: #FF0055;           // ROG Red (primary accent)
+    out property <color> accent-red-dim: #CC0044;       // Dimmed red
+    out property <color> accent-cyan: #00D9FF;          // Cyan accent
+    out property <color> accent-cyan-dim: #00A8CC;      // Dimmed cyan
+    out property <color> accent-purple: #B366FF;        // Purple accent
+    out property <color> accent-purple-dim: #8F52CC;    // Dimmed purple
+    out property <color> accent-orange: #FF6B00;        // Orange for warnings
+
+    // Text colors
+    out property <color> text-primary: #FFFFFF;
+    out property <color> text-secondary: #A8B2C0;
+    out property <color> text-tertiary: #6B7685;
+    out property <color> text-disabled: #404652;
+
+    // Status colors
+    out property <color> success: #00FF88;
+    out property <color> warning: #FFB800;
+    out property <color> danger: #FF3366;
+    out property <color> info: #00D9FF;
+
+    // Border colors
+    out property <color> border-default: #2A2E38;
+    out property <color> border-active: #FF0055;
+    out property <color> border-hover: #3A3E48;
+
+    // Gradient colors for charts and effects
+    out property <color> gradient-start: rgba(255, 0, 85, 0.3);
+    out property <color> gradient-end: rgba(255, 0, 85, 0.0);
+
+    // Border radius
+    out property <length> radius-xs: 2px;
+    out property <length> radius-sm: 4px;
+    out property <length> radius-md: 8px;
+    out property <length> radius-lg: 12px;
+    out property <length> radius-xl: 16px;
+    out property <length> radius-round: 50px;
+
+    // Spacing
+    out property <length> spacing-xs: 4px;
+    out property <length> spacing-sm: 8px;
+    out property <length> spacing-md: 16px;
+    out property <length> spacing-lg: 24px;
+    out property <length> spacing-xl: 32px;
+    out property <length> spacing-xxl: 48px;
+
+    // Typography
+    out property <length> font-size-xs: 10px;
+    out property <length> font-size-sm: 12px;
+    out property <length> font-size-body: 14px;
+    out property <length> font-size-lg: 16px;
+    out property <length> font-size-h3: 20px;
+    out property <length> font-size-h2: 24px;
+    out property <length> font-size-h1: 32px;
+    out property <length> font-size-display: 48px;
+
+    // Font weights (via font-weight property)
+    out property <int> font-weight-normal: 400;
+    out property <int> font-weight-medium: 500;
+    out property <int> font-weight-semibold: 600;
+    out property <int> font-weight-bold: 700;
+
+    // Shadows and effects
+    out property <length> glow-radius: 20px;
+    out property <color> glow-red: rgba(255, 0, 85, 0.4);
+    out property <color> glow-cyan: rgba(0, 217, 255, 0.4);
+
+    // Animation durations
+    out property <duration> anim-fast: 150ms;
+    out property <duration> anim-normal: 300ms;
+    out property <duration> anim-slow: 500ms;
+
+    // Sidebar dimensions
+    out property <length> sidebar-width: 240px;
+    out property <length> sidebar-collapsed-width: 64px;
+
+    // Card dimensions
+    out property <length> card-min-height: 120px;
+    out property <length> gauge-size: 120px;
+}

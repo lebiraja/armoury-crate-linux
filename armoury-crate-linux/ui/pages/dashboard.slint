@@ -1,0 +1,313 @@
+// Dashboard page - Main monitoring view for Armoury Crate Linux
+
+import { RogTheme } from "../theme.slint";
+import { MetricCard, ProgressBar, InfoRow } from "../widgets/gauge.slint";
+
+// Dashboard data global - receives monitoring data from Rust
+export global DashboardData {
+    // CPU metrics
+    in property <float> cpu-usage: 0;
+    in property <float> cpu-temp: 0;
+    in property <float> cpu-freq-ghz: 0;
+
+    // GPU metrics
+    in property <float> gpu-usage: 0;
+    in property <float> gpu-temp: 0;
+    in property <float> gpu-power-watts: 0;
+
+    // Memory metrics
+    in property <float> ram-usage-percent: 0;
+    in property <float> ram-total-gb: 0;
+    in property <float> ram-used-gb: 0;
+
+    // Fan and power
+    in property <int> fan1-rpm: 0;
+    in property <int> fan2-rpm: 0;
+    in property <float> power-watts: 0;
+    in property <float> battery-percent: 100;
+    in property <bool> on-ac-power: true;
+
+    // Current platform profile
+    in property <string> platform-profile: "Balanced";
+
+    // History arrays for graphs (future use)
+    in property <[float]> cpu-temp-history: [];
+    in property <[float]> gpu-temp-history: [];
+    in property <[float]> cpu-usage-history: [];
+    in property <[float]> gpu-usage-history: [];
+}
+
+export component PageDashboard inherits Rectangle {
+    background: RogTheme.bg-primary;
+
+    VerticalLayout {
+        padding: RogTheme.spacing-lg;
+        spacing: RogTheme.spacing-lg;
+
+        // Header
+        HorizontalLayout {
+            spacing: RogTheme.spacing-md;
+
+            Text {
+                text: "Dashboard";
+                font-size: RogTheme.font-size-h1;
+                font-weight: 700;
+                color: RogTheme.text-primary;
+                vertical-alignment: center;
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            // Profile indicator
+            Rectangle {
+                width: 180px;
+                height: 40px;
+                background: RogTheme.bg-secondary;
+                border-radius: RogTheme.radius-md;
+                border-width: 1px;
+                border-color: RogTheme.border-default;
+
+                HorizontalLayout {
+                    padding-left: RogTheme.spacing-md;
+                    padding-right: RogTheme.spacing-md;
+                    spacing: RogTheme.spacing-sm;
+
+                    Text {
+                        text: "Profile:";
+                        font-size: RogTheme.font-size-sm;
+                        color: RogTheme.text-tertiary;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: DashboardData.platform-profile;
+                        font-size: RogTheme.font-size-body;
+                        font-weight: 600;
+                        color: RogTheme.accent-cyan;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // Top row - Main metrics
+        HorizontalLayout {
+            spacing: RogTheme.spacing-md;
+            height: 200px;
+
+            // CPU Card
+            MetricCard {
+                horizontal-stretch: 1;
+                title: "CPU";
+                value: DashboardData.cpu-usage;
+                max-value: 100;
+                unit: "%";
+                subtitle: round(DashboardData.cpu-temp) + "°C · " + round(DashboardData.cpu-freq-ghz * 10) / 10 + " GHz";
+                accent-color: RogTheme.accent-cyan;
+            }
+
+            // GPU Card
+            MetricCard {
+                horizontal-stretch: 1;
+                title: "GPU";
+                value: DashboardData.gpu-usage;
+                max-value: 100;
+                unit: "%";
+                subtitle: round(DashboardData.gpu-temp) + "°C" +
+                          (DashboardData.gpu-power-watts > 0 ? " · " + round(DashboardData.gpu-power-watts) + "W" : "");
+                accent-color: RogTheme.accent-purple;
+            }
+
+            // RAM Card
+            Rectangle {
+                horizontal-stretch: 1;
+                background: RogTheme.bg-card;
+                border-radius: RogTheme.radius-lg;
+                border-width: 1px;
+                border-color: RogTheme.border-default;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-md;
+                    spacing: RogTheme.spacing-md;
+                    alignment: center;
+
+                    Text {
+                        text: "RAM";
+                        font-size: RogTheme.font-size-h3;
+                        font-weight: 600;
+                        color: RogTheme.text-primary;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: round(DashboardData.ram-used-gb * 10) / 10 + " / " +
+                              round(DashboardData.ram-total-gb * 10) / 10 + " GB";
+                        font-size: RogTheme.font-size-lg;
+                        color: RogTheme.accent-orange;
+                        horizontal-alignment: center;
+                    }
+
+                    ProgressBar {
+                        value: DashboardData.ram-usage-percent;
+                        max-value: 100;
+                        bar-color: RogTheme.accent-orange;
+                    }
+
+                    Text {
+                        text: round(DashboardData.ram-usage-percent) + "% used";
+                        font-size: RogTheme.font-size-sm;
+                        color: RogTheme.text-secondary;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            // Power & Fans Card
+            Rectangle {
+                horizontal-stretch: 1;
+                background: RogTheme.bg-card;
+                border-radius: RogTheme.radius-lg;
+                border-width: 1px;
+                border-color: RogTheme.border-default;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-md;
+                    spacing: RogTheme.spacing-sm;
+
+                    Text {
+                        text: "Fans & Power";
+                        font-size: RogTheme.font-size-lg;
+                        font-weight: 600;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Rectangle { height: RogTheme.spacing-xs; }
+
+                    InfoRow {
+                        label: "CPU Fan";
+                        value: DashboardData.fan1-rpm + " RPM";
+                        value-color: DashboardData.fan1-rpm > 3000 ? RogTheme.warning :
+                                    DashboardData.fan1-rpm > 0 ? RogTheme.success : RogTheme.text-tertiary;
+                    }
+
+                    InfoRow {
+                        label: "GPU Fan";
+                        value: DashboardData.fan2-rpm + " RPM";
+                        value-color: DashboardData.fan2-rpm > 3000 ? RogTheme.warning :
+                                    DashboardData.fan2-rpm > 0 ? RogTheme.success : RogTheme.text-tertiary;
+                    }
+
+                    Rectangle { height: RogTheme.spacing-xs; }
+
+                    InfoRow {
+                        label: "Power";
+                        value: DashboardData.on-ac-power ? "AC Power" : round(DashboardData.battery-percent) + "% Battery";
+                        value-color: DashboardData.on-ac-power ? RogTheme.success : RogTheme.accent-orange;
+                    }
+                }
+            }
+        }
+
+        // Bottom row - Temperature history (placeholder for now)
+        HorizontalLayout {
+            spacing: RogTheme.spacing-md;
+            vertical-stretch: 1;
+
+            // CPU Temperature Graph Placeholder
+            Rectangle {
+                horizontal-stretch: 1;
+                background: RogTheme.bg-card;
+                border-radius: RogTheme.radius-lg;
+                border-width: 1px;
+                border-color: RogTheme.border-default;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-md;
+                    spacing: RogTheme.spacing-sm;
+
+                    Text {
+                        text: "CPU Temperature";
+                        font-size: RogTheme.font-size-lg;
+                        font-weight: 600;
+                        color: RogTheme.text-primary;
+                    }
+
+                    // Graph placeholder
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: RogTheme.bg-tertiary;
+                        border-radius: RogTheme.radius-md;
+
+                        VerticalLayout {
+                            alignment: center;
+
+                            Text {
+                                text: round(DashboardData.cpu-temp) + "°C";
+                                font-size: RogTheme.font-size-display;
+                                font-weight: 700;
+                                color: DashboardData.cpu-temp > 85 ? RogTheme.danger :
+                                       DashboardData.cpu-temp > 70 ? RogTheme.warning : RogTheme.accent-cyan;
+                                horizontal-alignment: center;
+                            }
+
+                            Text {
+                                text: "Current Temperature";
+                                font-size: RogTheme.font-size-sm;
+                                color: RogTheme.text-tertiary;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // GPU Temperature Graph Placeholder
+            Rectangle {
+                horizontal-stretch: 1;
+                background: RogTheme.bg-card;
+                border-radius: RogTheme.radius-lg;
+                border-width: 1px;
+                border-color: RogTheme.border-default;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-md;
+                    spacing: RogTheme.spacing-sm;
+
+                    Text {
+                        text: "GPU Temperature";
+                        font-size: RogTheme.font-size-lg;
+                        font-weight: 600;
+                        color: RogTheme.text-primary;
+                    }
+
+                    // Graph placeholder
+                    Rectangle {
+                        vertical-stretch: 1;
+                        background: RogTheme.bg-tertiary;
+                        border-radius: RogTheme.radius-md;
+
+                        VerticalLayout {
+                            alignment: center;
+
+                            Text {
+                                text: round(DashboardData.gpu-temp) + "°C";
+                                font-size: RogTheme.font-size-display;
+                                font-weight: 700;
+                                color: DashboardData.gpu-temp > 85 ? RogTheme.danger :
+                                       DashboardData.gpu-temp > 70 ? RogTheme.warning : RogTheme.accent-purple;
+                                horizontal-alignment: center;
+                            }
+
+                            Text {
+                                text: "Current Temperature";
+                                font-size: RogTheme.font-size-sm;
+                                color: RogTheme.text-tertiary;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

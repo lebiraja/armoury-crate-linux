@@ -1,0 +1,162 @@
+// Gaming-styled sidebar navigation for Armoury Crate Linux
+
+import { RogTheme } from "../theme.slint";
+
+export component SidebarItem inherits Rectangle {
+    in property <string> label;
+    in property <bool> is-selected: false;
+    in property <bool> is-available: true;
+
+    callback clicked();
+
+    height: 48px;
+    border-radius: RogTheme.radius-md;
+    background: is-selected ? RogTheme.accent-red.with-alpha(0.15) :
+                touch.has-hover && is-available ? RogTheme.bg-hover : transparent;
+
+    animate background { duration: RogTheme.anim-fast; }
+
+    // Left accent bar for selected item
+    Rectangle {
+        x: 0;
+        width: is-selected ? 4px : 0px;
+        height: 100%;
+        background: RogTheme.accent-red;
+        border-radius: 2px;
+
+        animate width { duration: RogTheme.anim-fast; }
+    }
+
+    // Selection border
+    Rectangle {
+        x: 2px;
+        y: 2px;
+        width: parent.width - 4px;
+        height: parent.height - 4px;
+        border-radius: RogTheme.radius-md;
+        border-width: is-selected ? 1px : 0px;
+        border-color: RogTheme.accent-red.with-alpha(0.5);
+        background: transparent;
+
+        animate border-width { duration: RogTheme.anim-fast; }
+    }
+
+    HorizontalLayout {
+        padding-left: RogTheme.spacing-lg;
+        spacing: RogTheme.spacing-md;
+        alignment: start;
+
+        Text {
+            text: label;
+            color: is-selected ? RogTheme.accent-red :
+                   is-available ? RogTheme.text-primary : RogTheme.text-disabled;
+            font-size: RogTheme.font-size-body;
+            vertical-alignment: center;
+
+            animate color { duration: RogTheme.anim-fast; }
+        }
+    }
+
+    touch := TouchArea {
+        enabled: is-available;
+        mouse-cursor: is-available ? pointer : default;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component SidebarGaming inherits Rectangle {
+    in property <[string]> items: [];
+    in property <[bool]> available: [];
+    in-out property <int> current-item: 0;
+
+    callback item-clicked(int);
+
+    width: RogTheme.sidebar-width;
+    background: RogTheme.bg-secondary;
+
+    // Subtle right border
+    Rectangle {
+        x: parent.width - 1px;
+        width: 1px;
+        height: 100%;
+        background: RogTheme.border-default;
+    }
+
+    VerticalLayout {
+        padding: RogTheme.spacing-md;
+        spacing: RogTheme.spacing-xs;
+        alignment: start;
+
+        // Logo area
+        Rectangle {
+            height: 80px;
+
+            VerticalLayout {
+                alignment: center;
+
+                Text {
+                    text: "ARMOURY";
+                    font-size: RogTheme.font-size-h3;
+                    font-weight: 700;
+                    color: RogTheme.text-primary;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: "CRATE LINUX";
+                    font-size: RogTheme.font-size-sm;
+                    font-weight: 500;
+                    color: RogTheme.accent-red;
+                    horizontal-alignment: center;
+                    letter-spacing: 2px;
+                }
+            }
+        }
+
+        // Separator
+        Rectangle {
+            height: 1px;
+            background: RogTheme.border-default;
+        }
+
+        Rectangle { height: RogTheme.spacing-md; }
+
+        // Navigation items
+        for item[idx] in items: SidebarItem {
+            label: item;
+            is-selected: current-item == idx;
+            is-available: idx < available.length ? available[idx] : true;
+
+            clicked => {
+                if (idx < available.length ? available[idx] : true) {
+                    current-item = idx;
+                    root.item-clicked(idx);
+                }
+            }
+        }
+
+        // Spacer
+        Rectangle { vertical-stretch: 1; }
+
+        // Separator
+        Rectangle {
+            height: 1px;
+            background: RogTheme.border-default;
+        }
+
+        Rectangle { height: RogTheme.spacing-sm; }
+
+        // Quit button at bottom
+        SidebarItem {
+            label: "Quit App";
+            is-selected: false;
+            is-available: true;
+
+            clicked => {
+                // This will be connected to quit action
+            }
+        }
+    }
+}

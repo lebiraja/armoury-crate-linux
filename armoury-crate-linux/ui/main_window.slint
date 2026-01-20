@@ -1,0 +1,208 @@
+// Main Window for Armoury Crate Linux
+// Gaming-focused control center for ASUS ROG laptops
+
+import { RogTheme } from "theme.slint";
+import { SidebarGaming } from "widgets/sidebar_gaming.slint";
+import { PageDashboard, DashboardData } from "pages/dashboard.slint";
+import { PageAbout } from "pages/about.slint";
+
+export { DashboardData }
+
+export component MainWindow inherits Window {
+    title: "Armoury Crate Linux";
+    background: RogTheme.bg-primary;
+    min-width: 1200px;
+    min-height: 700px;
+    preferred-width: 1280px;
+    preferred-height: 800px;
+
+    // Sidebar navigation items
+    property <[string]> sidebar-items: [
+        "Dashboard",
+        "System Control",
+        "Scenario Profiles",
+        "Aura RGB",
+        "AniMe Matrix",
+        "Fan Curves",
+        "Settings",
+        "About"
+    ];
+
+    // Which items are available (based on hardware support)
+    property <[bool]> sidebar-items-available: [
+        true,   // Dashboard - always available
+        true,   // System Control - always available
+        false,  // Scenario Profiles - coming soon
+        true,   // Aura RGB
+        false,  // AniMe Matrix - hardware dependent
+        true,   // Fan Curves
+        true,   // Settings
+        true    // About
+    ];
+
+    // Currently selected page
+    property <int> current-page: 0;
+
+    HorizontalLayout {
+        // Sidebar navigation
+        sidebar := SidebarGaming {
+            items: sidebar-items;
+            available: sidebar-items-available;
+            current-item <=> current-page;
+
+            item-clicked(idx) => {
+                current-page = idx;
+            }
+        }
+
+        // Main content area
+        Rectangle {
+            background: RogTheme.bg-primary;
+            horizontal-stretch: 1;
+
+            // Dashboard page
+            if current-page == 0: PageDashboard {
+                width: 100%;
+                height: 100%;
+            }
+
+            // System Control placeholder
+            if current-page == 1: Rectangle {
+                background: RogTheme.bg-primary;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-lg;
+
+                    Text {
+                        text: "System Control";
+                        font-size: RogTheme.font-size-h1;
+                        font-weight: 700;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "Platform profiles, power settings, and display controls.\nComing in next update.";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+            }
+
+            // Scenario Profiles placeholder
+            if current-page == 2: Rectangle {
+                background: RogTheme.bg-primary;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-lg;
+
+                    Text {
+                        text: "Scenario Profiles";
+                        font-size: RogTheme.font-size-h1;
+                        font-weight: 700;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "Per-application automatic profile switching.\nComing soon!";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+            }
+
+            // Aura RGB placeholder
+            if current-page == 3: Rectangle {
+                background: RogTheme.bg-primary;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-lg;
+
+                    Text {
+                        text: "Aura RGB";
+                        font-size: RogTheme.font-size-h1;
+                        font-weight: 700;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "RGB keyboard lighting control.\nComing in next update.";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+            }
+
+            // AniMe Matrix placeholder
+            if current-page == 4: Rectangle {
+                background: RogTheme.bg-primary;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-lg;
+
+                    Text {
+                        text: "AniMe Matrix";
+                        font-size: RogTheme.font-size-h1;
+                        font-weight: 700;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "AniMe Matrix display control.\nComing soon!";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+            }
+
+            // Fan Curves placeholder
+            if current-page == 5: Rectangle {
+                background: RogTheme.bg-primary;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-lg;
+
+                    Text {
+                        text: "Fan Curves";
+                        font-size: RogTheme.font-size-h1;
+                        font-weight: 700;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "Custom fan curve configuration.\nComing in next update.";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+            }
+
+            // Settings placeholder
+            if current-page == 6: Rectangle {
+                background: RogTheme.bg-primary;
+
+                VerticalLayout {
+                    padding: RogTheme.spacing-lg;
+
+                    Text {
+                        text: "Settings";
+                        font-size: RogTheme.font-size-h1;
+                        font-weight: 700;
+                        color: RogTheme.text-primary;
+                    }
+
+                    Text {
+                        text: "Application settings and preferences.\nComing in next update.";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                    }
+                }
+            }
+
+            // About page
+            if current-page == 7: PageAbout {
+                width: 100%;
+                height: 100%;
+            }
+        }
+    }
+}
