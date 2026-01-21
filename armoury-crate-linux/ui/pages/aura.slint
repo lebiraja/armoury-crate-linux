@@ -1,0 +1,509 @@
+// Aura RGB control page - LED modes, colors, brightness
+// Gaming-styled controls for ASUS Aura keyboard lighting
+
+import { RogTheme } from "../theme.slint";
+
+// Aura page data bindings
+export global AuraPageData {
+    in-out property <bool> aura_available: false;
+
+    // Brightness (0=Off, 1=Low, 2=Med, 3=High)
+    in-out property <int> brightness: 2;
+    callback cb_brightness(int);
+
+    // LED mode
+    in-out property <int> led_mode: 0;
+    in-out property <[string]> available_modes: ["Static", "Breathe", "Strobe", "Rainbow", "Pulse"];
+    callback cb_led_mode(int);
+
+    // LED speed (0=Low, 1=Med, 2=High)
+    in-out property <int> led_speed: 1;
+    callback cb_speed(int);
+
+    // Color
+    in-out property <int> color_r: 255;
+    in-out property <int> color_g: 0;
+    in-out property <int> color_b: 85;
+    callback cb_color(int, int, int);
+}
+
+// Color swatch button
+component ColorSwatch inherits Rectangle {
+    in property <color> swatch_color;
+    in property <bool> selected: false;
+    callback clicked();
+
+    width: 40px;
+    height: 40px;
+    border-radius: RogTheme.radius-sm;
+    background: swatch_color;
+    border-width: selected ? 3px : 1px;
+    border-color: selected ? white : RogTheme.border-default;
+
+    drop-shadow-color: selected ? swatch_color.with-alpha(0.5) : transparent;
+    drop-shadow-blur: selected ? 12px : 0px;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+// Brightness button
+component BrightnessButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected: false;
+    callback clicked();
+
+    width: 60px;
+    height: 48px;
+    background: selected ? RogTheme.accent-cyan.with-alpha(0.15) : RogTheme.bg-card;
+    border-radius: RogTheme.radius-md;
+    border-width: 2px;
+    border-color: selected ? RogTheme.accent-cyan : RogTheme.border-default;
+
+    states [
+        hover when touch.has-hover && !selected: {
+            border-color: RogTheme.accent-cyan.with-alpha(0.5);
+        }
+    ]
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: label;
+        font-size: RogTheme.font-size-sm;
+        font-weight: selected ? 700 : 400;
+        color: selected ? RogTheme.accent-cyan : RogTheme.text-primary;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// Mode card
+component ModeCard inherits Rectangle {
+    in property <string> name;
+    in property <bool> selected: false;
+    callback clicked();
+
+    width: 100px;
+    height: 80px;
+    background: selected ? RogTheme.accent-purple.with-alpha(0.15) : RogTheme.bg-card;
+    border-radius: RogTheme.radius-md;
+    border-width: 2px;
+    border-color: selected ? RogTheme.accent-purple : RogTheme.border-default;
+
+    states [
+        hover when touch.has-hover && !selected: {
+            border-color: RogTheme.accent-purple.with-alpha(0.5);
+            background: RogTheme.bg-tertiary;
+        }
+    ]
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    VerticalLayout {
+        alignment: center;
+        spacing: RogTheme.spacing-xs;
+
+        // Preview rectangle with animated effect
+        Rectangle {
+            width: 60px;
+            height: 24px;
+            border-radius: 4px;
+            background: @linear-gradient(90deg,
+                rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b),
+                rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b).with-alpha(0.5)
+            );
+            horizontal-stretch: 0;
+        }
+
+        Text {
+            text: name;
+            font-size: RogTheme.font-size-sm;
+            font-weight: selected ? 700 : 400;
+            color: selected ? RogTheme.accent-purple : RogTheme.text-primary;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+// Color slider component
+component ColorSlider inherits Rectangle {
+    in property <string> label;
+    in property <color> slider_color;
+    in-out property <int> value: 128;
+    callback changed(int);
+
+    height: 48px;
+
+    HorizontalLayout {
+        spacing: RogTheme.spacing-md;
+
+        Text {
+            text: label;
+            font-size: RogTheme.font-size-body;
+            color: slider_color;
+            font-weight: 600;
+            vertical-alignment: center;
+            width: 20px;
+        }
+
+        // Slider track
+        track := Rectangle {
+            height: 8px;
+            border-radius: 4px;
+            background: @linear-gradient(90deg, black, slider_color);
+
+            // Handle
+            handle := Rectangle {
+                x: clamp((value / 255.0) * parent.width - self.width / 2, 0px, parent.width - self.width);
+                y: (parent.height - self.height) / 2;
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                background: slider_color;
+                border-width: 2px;
+                border-color: white;
+            }
+
+            TouchArea {
+                moved => {
+                    value = clamp(round(self.mouse-x / parent.width * 255), 0, 255);
+                    changed(value);
+                }
+            }
+        }
+
+        Text {
+            text: value;
+            font-size: RogTheme.font-size-sm;
+            color: RogTheme.text-secondary;
+            vertical-alignment: center;
+            width: 40px;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+// Main Aura page
+export component PageAura inherits Rectangle {
+    background: transparent;
+
+    if !AuraPageData.aura_available: Rectangle {
+        VerticalLayout {
+            alignment: center;
+            spacing: RogTheme.spacing-md;
+
+            Text {
+                text: "🎨";
+                font-size: 64px;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "Aura RGB Not Available";
+                font-size: RogTheme.font-size-h2;
+                color: RogTheme.text-secondary;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "No Aura-compatible keyboard detected";
+                font-size: RogTheme.font-size-body;
+                color: RogTheme.text-tertiary;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    if AuraPageData.aura_available: VerticalLayout {
+        padding: RogTheme.spacing-lg;
+        spacing: RogTheme.spacing-lg;
+
+        // Header
+        Text {
+            text: "Aura RGB";
+            font-size: RogTheme.font-size-h1;
+            font-weight: 700;
+            color: RogTheme.text-primary;
+        }
+
+        // Brightness Section
+        Rectangle {
+            background: RogTheme.bg-secondary;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            VerticalLayout {
+                padding: RogTheme.spacing-lg;
+                spacing: RogTheme.spacing-md;
+
+                Text {
+                    text: "Brightness";
+                    font-size: RogTheme.font-size-h3;
+                    font-weight: 600;
+                    color: RogTheme.text-primary;
+                }
+
+                HorizontalLayout {
+                    spacing: RogTheme.spacing-sm;
+
+                    BrightnessButton {
+                        label: "Off";
+                        selected: AuraPageData.brightness == 0;
+                        clicked => { AuraPageData.brightness = 0; AuraPageData.cb_brightness(0); }
+                    }
+
+                    BrightnessButton {
+                        label: "Low";
+                        selected: AuraPageData.brightness == 1;
+                        clicked => { AuraPageData.brightness = 1; AuraPageData.cb_brightness(1); }
+                    }
+
+                    BrightnessButton {
+                        label: "Med";
+                        selected: AuraPageData.brightness == 2;
+                        clicked => { AuraPageData.brightness = 2; AuraPageData.cb_brightness(2); }
+                    }
+
+                    BrightnessButton {
+                        label: "High";
+                        selected: AuraPageData.brightness == 3;
+                        clicked => { AuraPageData.brightness = 3; AuraPageData.cb_brightness(3); }
+                    }
+                }
+            }
+        }
+
+        // LED Mode Section
+        Rectangle {
+            background: RogTheme.bg-secondary;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            VerticalLayout {
+                padding: RogTheme.spacing-lg;
+                spacing: RogTheme.spacing-md;
+
+                Text {
+                    text: "LED Effect";
+                    font-size: RogTheme.font-size-h3;
+                    font-weight: 600;
+                    color: RogTheme.text-primary;
+                }
+
+                HorizontalLayout {
+                    spacing: RogTheme.spacing-sm;
+
+                    ModeCard {
+                        name: "Static";
+                        selected: AuraPageData.led_mode == 0;
+                        clicked => { AuraPageData.led_mode = 0; AuraPageData.cb_led_mode(0); }
+                    }
+
+                    ModeCard {
+                        name: "Breathe";
+                        selected: AuraPageData.led_mode == 1;
+                        clicked => { AuraPageData.led_mode = 1; AuraPageData.cb_led_mode(1); }
+                    }
+
+                    ModeCard {
+                        name: "Strobe";
+                        selected: AuraPageData.led_mode == 2;
+                        clicked => { AuraPageData.led_mode = 2; AuraPageData.cb_led_mode(2); }
+                    }
+
+                    ModeCard {
+                        name: "Rainbow";
+                        selected: AuraPageData.led_mode == 3;
+                        clicked => { AuraPageData.led_mode = 3; AuraPageData.cb_led_mode(3); }
+                    }
+
+                    ModeCard {
+                        name: "Pulse";
+                        selected: AuraPageData.led_mode == 4;
+                        clicked => { AuraPageData.led_mode = 4; AuraPageData.cb_led_mode(4); }
+                    }
+                }
+
+                // Speed controls (for animated modes)
+                if AuraPageData.led_mode > 0: HorizontalLayout {
+                    spacing: RogTheme.spacing-md;
+                    alignment: start;
+
+                    Text {
+                        text: "Speed:";
+                        font-size: RogTheme.font-size-body;
+                        color: RogTheme.text-secondary;
+                        vertical-alignment: center;
+                    }
+
+                    BrightnessButton {
+                        label: "Slow";
+                        selected: AuraPageData.led_speed == 0;
+                        clicked => { AuraPageData.led_speed = 0; AuraPageData.cb_speed(0); }
+                    }
+
+                    BrightnessButton {
+                        label: "Med";
+                        selected: AuraPageData.led_speed == 1;
+                        clicked => { AuraPageData.led_speed = 1; AuraPageData.cb_speed(1); }
+                    }
+
+                    BrightnessButton {
+                        label: "Fast";
+                        selected: AuraPageData.led_speed == 2;
+                        clicked => { AuraPageData.led_speed = 2; AuraPageData.cb_speed(2); }
+                    }
+                }
+            }
+        }
+
+        // Color Section
+        Rectangle {
+            background: RogTheme.bg-secondary;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            VerticalLayout {
+                padding: RogTheme.spacing-lg;
+                spacing: RogTheme.spacing-md;
+
+                HorizontalLayout {
+                    Text {
+                        text: "Color";
+                        font-size: RogTheme.font-size-h3;
+                        font-weight: 600;
+                        color: RogTheme.text-primary;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle { horizontal-stretch: 1; }
+
+                    // Color preview
+                    Rectangle {
+                        width: 60px;
+                        height: 32px;
+                        border-radius: RogTheme.radius-md;
+                        background: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
+                        border-width: 1px;
+                        border-color: RogTheme.border-default;
+
+                        drop-shadow-color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b).with-alpha(0.5);
+                        drop-shadow-blur: 12px;
+                    }
+                }
+
+                // Quick color presets
+                HorizontalLayout {
+                    spacing: RogTheme.spacing-sm;
+
+                    ColorSwatch {
+                        swatch_color: #FF0055;
+                        clicked => {
+                            AuraPageData.color_r = 255;
+                            AuraPageData.color_g = 0;
+                            AuraPageData.color_b = 85;
+                            AuraPageData.cb_color(255, 0, 85);
+                        }
+                    }
+
+                    ColorSwatch {
+                        swatch_color: #00D9FF;
+                        clicked => {
+                            AuraPageData.color_r = 0;
+                            AuraPageData.color_g = 217;
+                            AuraPageData.color_b = 255;
+                            AuraPageData.cb_color(0, 217, 255);
+                        }
+                    }
+
+                    ColorSwatch {
+                        swatch_color: #B366FF;
+                        clicked => {
+                            AuraPageData.color_r = 179;
+                            AuraPageData.color_g = 102;
+                            AuraPageData.color_b = 255;
+                            AuraPageData.cb_color(179, 102, 255);
+                        }
+                    }
+
+                    ColorSwatch {
+                        swatch_color: #00FF66;
+                        clicked => {
+                            AuraPageData.color_r = 0;
+                            AuraPageData.color_g = 255;
+                            AuraPageData.color_b = 102;
+                            AuraPageData.cb_color(0, 255, 102);
+                        }
+                    }
+
+                    ColorSwatch {
+                        swatch_color: #FFAA00;
+                        clicked => {
+                            AuraPageData.color_r = 255;
+                            AuraPageData.color_g = 170;
+                            AuraPageData.color_b = 0;
+                            AuraPageData.cb_color(255, 170, 0);
+                        }
+                    }
+
+                    ColorSwatch {
+                        swatch_color: #FFFFFF;
+                        clicked => {
+                            AuraPageData.color_r = 255;
+                            AuraPageData.color_g = 255;
+                            AuraPageData.color_b = 255;
+                            AuraPageData.cb_color(255, 255, 255);
+                        }
+                    }
+                }
+
+                // RGB Sliders
+                VerticalLayout {
+                    spacing: RogTheme.spacing-xs;
+
+                    ColorSlider {
+                        label: "R";
+                        slider_color: #FF4444;
+                        value: AuraPageData.color_r;
+                        changed(v) => {
+                            AuraPageData.color_r = v;
+                            AuraPageData.cb_color(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
+                        }
+                    }
+
+                    ColorSlider {
+                        label: "G";
+                        slider_color: #44FF44;
+                        value: AuraPageData.color_g;
+                        changed(v) => {
+                            AuraPageData.color_g = v;
+                            AuraPageData.cb_color(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
+                        }
+                    }
+
+                    ColorSlider {
+                        label: "B";
+                        slider_color: #4444FF;
+                        value: AuraPageData.color_b;
+                        changed(v) => {
+                            AuraPageData.color_b = v;
+                            AuraPageData.cb_color(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Spacer
+        Rectangle { vertical-stretch: 1; }
+    }
+}

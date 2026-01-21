@@ -1,0 +1,413 @@
+// System control page - Platform profiles, battery, power controls
+// Gaming-styled controls for ASUS ROG laptops
+
+import { RogTheme } from "../theme.slint";
+import { Slider, ComboBox, Switch } from "std-widgets.slint";
+
+// System page data bindings
+export global SystemPageData {
+    // Platform profile
+    in-out property <int> platform_profile: 0;
+    in-out property <[string]> platform_profile_choices: ["Balanced", "Performance", "Quiet"];
+    callback cb_platform_profile(int);
+
+    // Charge control
+    in-out property <bool> charge_control_enabled: false;
+    in-out property <float> charge_control_end_threshold: 100;
+    callback cb_charge_control_end_threshold(int);
+
+    // Panel settings
+    in-out property <bool> panel_od: false;
+    callback cb_panel_od(bool);
+
+    in-out property <int> mini_led_mode: 0;
+    callback cb_mini_led_mode(int);
+
+    // GPU MUX
+    in-out property <int> gpu_mux_mode: 0;
+    callback cb_gpu_mux_mode(int);
+
+    // PPT/TDP settings (min/max/current)
+    in-out property <int> ppt_pl1_spl_min: 5;
+    in-out property <int> ppt_pl1_spl_max: 80;
+    in-out property <float> ppt_pl1_spl: 30;
+    callback cb_ppt_pl1_spl(int);
+}
+
+// Gaming-styled toggle switch
+component GamingToggle inherits Rectangle {
+    in property <string> label;
+    in-out property <bool> checked: false;
+    callback toggled(bool);
+
+    height: 48px;
+    background: RogTheme.bg-card;
+    border-radius: RogTheme.radius-md;
+    border-width: 1px;
+    border-color: checked ? RogTheme.accent-cyan.with-alpha(0.5) : RogTheme.border-default;
+
+    HorizontalLayout {
+        padding-left: RogTheme.spacing-md;
+        padding-right: RogTheme.spacing-md;
+        spacing: RogTheme.spacing-md;
+
+        Text {
+            text: label;
+            font-size: RogTheme.font-size-body;
+            color: RogTheme.text-primary;
+            vertical-alignment: center;
+        }
+
+        Rectangle { horizontal-stretch: 1; }
+
+        // Toggle track
+        track := Rectangle {
+            width: 48px;
+            height: 24px;
+            border-radius: 12px;
+            background: checked ? RogTheme.accent-cyan.with-alpha(0.3) : RogTheme.bg-tertiary;
+            border-width: 1px;
+            border-color: checked ? RogTheme.accent-cyan : RogTheme.border-default;
+
+            // Toggle knob
+            knob := Rectangle {
+                x: checked ? parent.width - self.width - 4px : 4px;
+                y: (parent.height - self.height) / 2;
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                background: checked ? RogTheme.accent-cyan : RogTheme.text-secondary;
+
+                animate x { duration: RogTheme.anim-fast; easing: ease-out; }
+                animate background { duration: RogTheme.anim-fast; }
+            }
+        }
+    }
+
+    TouchArea {
+        clicked => {
+            checked = !checked;
+            toggled(checked);
+        }
+    }
+}
+
+// Gaming-styled slider
+component GamingSlider inherits Rectangle {
+    in property <string> label;
+    in property <string> unit: "";
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in-out property <float> value: 50;
+    callback changed(int);
+
+    height: 80px;
+    background: RogTheme.bg-card;
+    border-radius: RogTheme.radius-md;
+    border-width: 1px;
+    border-color: RogTheme.border-default;
+
+    VerticalLayout {
+        padding: RogTheme.spacing-md;
+        spacing: RogTheme.spacing-sm;
+
+        HorizontalLayout {
+            Text {
+                text: label;
+                font-size: RogTheme.font-size-body;
+                color: RogTheme.text-secondary;
+                vertical-alignment: center;
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            Text {
+                text: round(value) + unit;
+                font-size: RogTheme.font-size-body;
+                font-weight: 700;
+                color: RogTheme.accent-cyan;
+                vertical-alignment: center;
+            }
+        }
+
+        // Slider track
+        track := Rectangle {
+            height: 8px;
+            border-radius: 4px;
+            background: RogTheme.bg-tertiary;
+
+            // Filled portion
+            Rectangle {
+                width: parent.width * clamp((value - minimum) / (maximum - minimum), 0, 1);
+                height: 100%;
+                border-radius: parent.border-radius;
+                background: RogTheme.accent-cyan;
+            }
+
+            // Slider handle
+            handle := Rectangle {
+                x: parent.width * clamp((value - minimum) / (maximum - minimum), 0, 1) - self.width / 2;
+                y: (parent.height - self.height) / 2;
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                background: RogTheme.accent-cyan;
+                border-width: 2px;
+                border-color: RogTheme.bg-primary;
+
+                drop-shadow-color: RogTheme.accent-cyan.with-alpha(0.3);
+                drop-shadow-blur: 8px;
+            }
+
+            TouchArea {
+                moved => {
+                    value = clamp(
+                        minimum + (self.mouse-x / parent.width) * (maximum - minimum),
+                        minimum,
+                        maximum
+                    );
+                }
+                pointer-event(event) => {
+                    if event.kind == PointerEventKind.up {
+                        changed(round(value));
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Profile button for platform profile selection
+component ProfileButton inherits Rectangle {
+    in property <string> label;
+    in property <string> icon: "";
+    in property <bool> selected: false;
+    callback clicked();
+
+    width: 120px;
+    height: 80px;
+    background: selected ? RogTheme.accent-red.with-alpha(0.15) : RogTheme.bg-card;
+    border-radius: RogTheme.radius-md;
+    border-width: 2px;
+    border-color: selected ? RogTheme.accent-red : RogTheme.border-default;
+
+    states [
+        hover when touch.has-hover && !selected: {
+            border-color: RogTheme.accent-red.with-alpha(0.5);
+        }
+    ]
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    VerticalLayout {
+        alignment: center;
+        spacing: RogTheme.spacing-xs;
+
+        Text {
+            text: icon;
+            font-size: 24px;
+            color: selected ? RogTheme.accent-red : RogTheme.text-secondary;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: label;
+            font-size: RogTheme.font-size-sm;
+            font-weight: selected ? 700 : 400;
+            color: selected ? RogTheme.accent-red : RogTheme.text-primary;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+// Main system page
+export component PageSystem inherits Rectangle {
+    background: transparent;
+
+    VerticalLayout {
+        padding: RogTheme.spacing-lg;
+        spacing: RogTheme.spacing-lg;
+
+        // Header
+        Text {
+            text: "System Control";
+            font-size: RogTheme.font-size-h1;
+            font-weight: 700;
+            color: RogTheme.text-primary;
+        }
+
+        // Platform Profile Section
+        Rectangle {
+            background: RogTheme.bg-secondary;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            VerticalLayout {
+                padding: RogTheme.spacing-lg;
+                spacing: RogTheme.spacing-md;
+
+                Text {
+                    text: "Platform Profile";
+                    font-size: RogTheme.font-size-h3;
+                    font-weight: 600;
+                    color: RogTheme.text-primary;
+                }
+
+                Text {
+                    text: "Select a performance profile based on your usage";
+                    font-size: RogTheme.font-size-sm;
+                    color: RogTheme.text-secondary;
+                }
+
+                HorizontalLayout {
+                    spacing: RogTheme.spacing-md;
+
+                    ProfileButton {
+                        label: "Quiet";
+                        icon: "🔇";
+                        selected: SystemPageData.platform_profile == 2;
+                        clicked => { SystemPageData.cb_platform_profile(2); }
+                    }
+
+                    ProfileButton {
+                        label: "Balanced";
+                        icon: "⚖️";
+                        selected: SystemPageData.platform_profile == 0;
+                        clicked => { SystemPageData.cb_platform_profile(0); }
+                    }
+
+                    ProfileButton {
+                        label: "Performance";
+                        icon: "🚀";
+                        selected: SystemPageData.platform_profile == 1;
+                        clicked => { SystemPageData.cb_platform_profile(1); }
+                    }
+                }
+            }
+        }
+
+        // Battery Section
+        Rectangle {
+            background: RogTheme.bg-secondary;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            VerticalLayout {
+                padding: RogTheme.spacing-lg;
+                spacing: RogTheme.spacing-md;
+
+                Text {
+                    text: "Battery Health";
+                    font-size: RogTheme.font-size-h3;
+                    font-weight: 600;
+                    color: RogTheme.text-primary;
+                }
+
+                GamingToggle {
+                    label: "Enable Charge Limit";
+                    checked: SystemPageData.charge_control_enabled;
+                    toggled(enabled) => {
+                        SystemPageData.charge_control_enabled = enabled;
+                        if enabled {
+                            SystemPageData.cb_charge_control_end_threshold(80);
+                        } else {
+                            SystemPageData.cb_charge_control_end_threshold(100);
+                        }
+                    }
+                }
+
+                if SystemPageData.charge_control_enabled: GamingSlider {
+                    label: "Charge Limit";
+                    unit: "%";
+                    minimum: 20;
+                    maximum: 100;
+                    value: SystemPageData.charge_control_end_threshold;
+                    changed(val) => {
+                        SystemPageData.charge_control_end_threshold = val;
+                        SystemPageData.cb_charge_control_end_threshold(val);
+                    }
+                }
+            }
+        }
+
+        // Display Section
+        Rectangle {
+            background: RogTheme.bg-secondary;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            VerticalLayout {
+                padding: RogTheme.spacing-lg;
+                spacing: RogTheme.spacing-md;
+
+                Text {
+                    text: "Display Settings";
+                    font-size: RogTheme.font-size-h3;
+                    font-weight: 600;
+                    color: RogTheme.text-primary;
+                }
+
+                GamingToggle {
+                    label: "Panel Overdrive";
+                    checked: SystemPageData.panel_od;
+                    toggled(enabled) => {
+                        SystemPageData.panel_od = enabled;
+                        SystemPageData.cb_panel_od(enabled);
+                    }
+                }
+            }
+        }
+
+        // GPU MUX Section
+        Rectangle {
+            background: RogTheme.bg-secondary;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            VerticalLayout {
+                padding: RogTheme.spacing-lg;
+                spacing: RogTheme.spacing-md;
+
+                Text {
+                    text: "GPU Mode";
+                    font-size: RogTheme.font-size-h3;
+                    font-weight: 600;
+                    color: RogTheme.text-primary;
+                }
+
+                Text {
+                    text: "Switch between hybrid and discrete GPU mode (requires reboot)";
+                    font-size: RogTheme.font-size-sm;
+                    color: RogTheme.text-secondary;
+                }
+
+                HorizontalLayout {
+                    spacing: RogTheme.spacing-md;
+
+                    ProfileButton {
+                        label: "Hybrid";
+                        icon: "🔋";
+                        selected: SystemPageData.gpu_mux_mode == 0;
+                        clicked => { SystemPageData.cb_gpu_mux_mode(0); }
+                    }
+
+                    ProfileButton {
+                        label: "Discrete";
+                        icon: "🎮";
+                        selected: SystemPageData.gpu_mux_mode == 1;
+                        clicked => { SystemPageData.cb_gpu_mux_mode(1); }
+                    }
+                }
+            }
+        }
+
+        // Spacer
+        Rectangle { vertical-stretch: 1; }
+    }
+}

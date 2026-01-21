@@ -1,0 +1,486 @@
+// Fan curves page - Custom fan control
+// Gaming-styled fan curve editor for ASUS ROG laptops
+
+import { RogTheme } from "../theme.slint";
+
+// Fan curve point structure
+export struct FanCurvePoint {
+    temp: int,
+    pwm: int,
+}
+
+// Fans page data bindings
+export global FansPageData {
+    in-out property <bool> fans_available: false;
+
+    // Selected profile (0=Balanced, 1=Performance, 2=Quiet)
+    in-out property <int> selected_profile: 0;
+
+    // CPU fan
+    in-out property <bool> cpu_fan_enabled: true;
+    in-out property <[FanCurvePoint]> cpu_fan_curve: [
+        { temp: 20, pwm: 0 },
+        { temp: 30, pwm: 10 },
+        { temp: 40, pwm: 20 },
+        { temp: 50, pwm: 30 },
+        { temp: 60, pwm: 50 },
+        { temp: 70, pwm: 70 },
+        { temp: 80, pwm: 90 },
+        { temp: 100, pwm: 100 },
+    ];
+
+    // GPU fan
+    in-out property <bool> gpu_fan_enabled: true;
+    in-out property <[FanCurvePoint]> gpu_fan_curve: [
+        { temp: 20, pwm: 0 },
+        { temp: 30, pwm: 10 },
+        { temp: 40, pwm: 20 },
+        { temp: 50, pwm: 30 },
+        { temp: 60, pwm: 50 },
+        { temp: 70, pwm: 70 },
+        { temp: 80, pwm: 90 },
+        { temp: 100, pwm: 100 },
+    ];
+
+    // Currently selected fan (0=CPU, 1=GPU)
+    in-out property <int> selected_fan: 0;
+
+    // Callbacks
+    callback cb_apply_curves();
+    callback cb_reset_defaults();
+    callback cb_set_cpu_fan_enabled(bool);
+    callback cb_set_gpu_fan_enabled(bool);
+}
+
+// Profile tab button
+component ProfileTab inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected: false;
+    callback clicked();
+
+    height: 40px;
+    horizontal-stretch: 1;
+    background: selected ? RogTheme.accent-cyan.with-alpha(0.15) : transparent;
+    border-radius: RogTheme.radius-md;
+
+    states [
+        hover when touch.has-hover && !selected: {
+            background: RogTheme.bg-tertiary;
+        }
+    ]
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: label;
+        font-size: RogTheme.font-size-body;
+        font-weight: selected ? 700 : 400;
+        color: selected ? RogTheme.accent-cyan : RogTheme.text-secondary;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    // Bottom indicator
+    if selected: Rectangle {
+        y: parent.height - 3px;
+        height: 3px;
+        background: RogTheme.accent-cyan;
+        border-radius: 2px;
+    }
+}
+
+// Fan tab button
+component FanTab inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected: false;
+    in property <bool> enabled: true;
+    callback clicked();
+
+    width: 120px;
+    height: 48px;
+    background: selected ? RogTheme.accent-red.with-alpha(0.15) : RogTheme.bg-card;
+    border-radius: RogTheme.radius-md;
+    border-width: 2px;
+    border-color: selected ? RogTheme.accent-red : RogTheme.border-default;
+    opacity: enabled ? 1.0 : 0.5;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    VerticalLayout {
+        alignment: center;
+        spacing: 2px;
+
+        Text {
+            text: label;
+            font-size: RogTheme.font-size-body;
+            font-weight: selected ? 700 : 400;
+            color: selected ? RogTheme.accent-red : RogTheme.text-primary;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: enabled ? "Enabled" : "Disabled";
+            font-size: RogTheme.font-size-xs;
+            color: enabled ? RogTheme.status-success : RogTheme.text-tertiary;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+// Gaming button component
+component GamingButton inherits Rectangle {
+    in property <string> label;
+    in property <color> button_color: RogTheme.accent-cyan;
+    in property <bool> outlined: false;
+    callback clicked();
+
+    height: 40px;
+    min-width: 100px;
+    background: outlined ? transparent : button_color;
+    border-radius: RogTheme.radius-md;
+    border-width: outlined ? 2px : 0px;
+    border-color: button_color;
+
+    states [
+        hover when touch.has-hover: {
+            background: outlined ? button_color.with-alpha(0.15) : button_color.with-alpha(0.8);
+        }
+    ]
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: label;
+        font-size: RogTheme.font-size-body;
+        font-weight: 600;
+        color: outlined ? button_color : white;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// Toggle switch
+component FanToggle inherits Rectangle {
+    in property <string> label;
+    in-out property <bool> checked: true;
+    callback toggled(bool);
+
+    height: 40px;
+
+    HorizontalLayout {
+        spacing: RogTheme.spacing-md;
+
+        Text {
+            text: label;
+            font-size: RogTheme.font-size-body;
+            color: RogTheme.text-primary;
+            vertical-alignment: center;
+        }
+
+        Rectangle { horizontal-stretch: 1; }
+
+        // Toggle track
+        track := Rectangle {
+            width: 44px;
+            height: 24px;
+            border-radius: 12px;
+            background: checked ? RogTheme.accent-cyan.with-alpha(0.3) : RogTheme.bg-tertiary;
+            border-width: 1px;
+            border-color: checked ? RogTheme.accent-cyan : RogTheme.border-default;
+
+            knob := Rectangle {
+                x: checked ? parent.width - self.width - 3px : 3px;
+                y: (parent.height - self.height) / 2;
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                background: checked ? RogTheme.accent-cyan : RogTheme.text-secondary;
+
+                animate x { duration: RogTheme.anim-fast; easing: ease-out; }
+            }
+        }
+
+        TouchArea {
+            width: 44px;
+            clicked => {
+                checked = !checked;
+                toggled(checked);
+            }
+        }
+    }
+}
+
+// Fan curve point display row
+component CurvePointRow inherits Rectangle {
+    in property <int> index;
+    in property <int> temp;
+    in property <int> pwm;
+    in property <color> accent: RogTheme.accent-red;
+
+    height: 36px;
+    background: RogTheme.bg-tertiary.with-alpha(0.5);
+    border-radius: RogTheme.radius-sm;
+
+    HorizontalLayout {
+        padding-left: RogTheme.spacing-md;
+        padding-right: RogTheme.spacing-md;
+        spacing: RogTheme.spacing-lg;
+
+        Text {
+            text: "Point " + (index + 1);
+            font-size: RogTheme.font-size-sm;
+            color: RogTheme.text-tertiary;
+            vertical-alignment: center;
+            width: 60px;
+        }
+
+        Text {
+            text: temp + "°C";
+            font-size: RogTheme.font-size-body;
+            font-weight: 600;
+            color: RogTheme.text-primary;
+            vertical-alignment: center;
+            width: 60px;
+        }
+
+        // Visual bar for PWM
+        Rectangle {
+            horizontal-stretch: 1;
+            height: 12px;
+            border-radius: 6px;
+            background: RogTheme.bg-card;
+
+            Rectangle {
+                width: parent.width * (pwm / 100.0);
+                height: 100%;
+                border-radius: parent.border-radius;
+                background: accent;
+            }
+        }
+
+        Text {
+            text: pwm + "%";
+            font-size: RogTheme.font-size-body;
+            font-weight: 600;
+            color: accent;
+            vertical-alignment: center;
+            width: 50px;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+// Simple bar-based fan curve visualization
+component FanCurveVisualization inherits Rectangle {
+    in property <[FanCurvePoint]> curve;
+    in property <color> curve_color: RogTheme.accent-red;
+
+    background: RogTheme.bg-card;
+    border-radius: RogTheme.radius-lg;
+    border-width: 1px;
+    border-color: RogTheme.border-default;
+
+    VerticalLayout {
+        padding: RogTheme.spacing-md;
+        spacing: RogTheme.spacing-xs;
+
+        // Header
+        HorizontalLayout {
+            padding-left: RogTheme.spacing-md;
+            padding-right: RogTheme.spacing-md;
+
+            Text {
+                text: "Point";
+                font-size: RogTheme.font-size-xs;
+                color: RogTheme.text-tertiary;
+                width: 60px;
+            }
+
+            Text {
+                text: "Temp";
+                font-size: RogTheme.font-size-xs;
+                color: RogTheme.text-tertiary;
+                width: 60px;
+            }
+
+            Text {
+                text: "Fan Speed";
+                font-size: RogTheme.font-size-xs;
+                color: RogTheme.text-tertiary;
+                horizontal-stretch: 1;
+            }
+
+            Text {
+                text: "PWM";
+                font-size: RogTheme.font-size-xs;
+                color: RogTheme.text-tertiary;
+                width: 50px;
+                horizontal-alignment: right;
+            }
+        }
+
+        // Curve points
+        for point[idx] in curve: CurvePointRow {
+            index: idx;
+            temp: point.temp;
+            pwm: point.pwm;
+            accent: curve_color;
+        }
+    }
+}
+
+// Main fans page
+export component PageFans inherits Rectangle {
+    background: transparent;
+
+    if !FansPageData.fans_available: Rectangle {
+        VerticalLayout {
+            alignment: center;
+            spacing: RogTheme.spacing-md;
+
+            Text {
+                text: "🌀";
+                font-size: 64px;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "Fan Control Not Available";
+                font-size: RogTheme.font-size-h2;
+                color: RogTheme.text-secondary;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "Custom fan curves are not supported on this device";
+                font-size: RogTheme.font-size-body;
+                color: RogTheme.text-tertiary;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    if FansPageData.fans_available: VerticalLayout {
+        padding: RogTheme.spacing-lg;
+        spacing: RogTheme.spacing-lg;
+
+        // Header
+        HorizontalLayout {
+            Text {
+                text: "Fan Curves";
+                font-size: RogTheme.font-size-h1;
+                font-weight: 700;
+                color: RogTheme.text-primary;
+                vertical-alignment: center;
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            HorizontalLayout {
+                spacing: RogTheme.spacing-sm;
+
+                GamingButton {
+                    label: "Reset";
+                    button_color: RogTheme.text-secondary;
+                    outlined: true;
+                    clicked => { FansPageData.cb_reset_defaults(); }
+                }
+
+                GamingButton {
+                    label: "Apply";
+                    button_color: RogTheme.accent-cyan;
+                    clicked => { FansPageData.cb_apply_curves(); }
+                }
+            }
+        }
+
+        // Profile tabs
+        Rectangle {
+            height: 48px;
+            background: RogTheme.bg-secondary;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            HorizontalLayout {
+                padding: RogTheme.spacing-xs;
+                spacing: RogTheme.spacing-xs;
+
+                ProfileTab {
+                    label: "Balanced";
+                    selected: FansPageData.selected_profile == 0;
+                    clicked => { FansPageData.selected_profile = 0; }
+                }
+
+                ProfileTab {
+                    label: "Performance";
+                    selected: FansPageData.selected_profile == 1;
+                    clicked => { FansPageData.selected_profile = 1; }
+                }
+
+                ProfileTab {
+                    label: "Quiet";
+                    selected: FansPageData.selected_profile == 2;
+                    clicked => { FansPageData.selected_profile = 2; }
+                }
+            }
+        }
+
+        // Fan selection and toggle
+        HorizontalLayout {
+            spacing: RogTheme.spacing-md;
+
+            FanTab {
+                label: "CPU Fan";
+                selected: FansPageData.selected_fan == 0;
+                enabled: FansPageData.cpu_fan_enabled;
+                clicked => { FansPageData.selected_fan = 0; }
+            }
+
+            FanTab {
+                label: "GPU Fan";
+                selected: FansPageData.selected_fan == 1;
+                enabled: FansPageData.gpu_fan_enabled;
+                clicked => { FansPageData.selected_fan = 1; }
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            // Enable/disable toggle for selected fan
+            FanToggle {
+                label: FansPageData.selected_fan == 0 ? "CPU Fan Control" : "GPU Fan Control";
+                checked: FansPageData.selected_fan == 0 ? FansPageData.cpu_fan_enabled : FansPageData.gpu_fan_enabled;
+                toggled(enabled) => {
+                    if FansPageData.selected_fan == 0 {
+                        FansPageData.cpu_fan_enabled = enabled;
+                        FansPageData.cb_set_cpu_fan_enabled(enabled);
+                    } else {
+                        FansPageData.gpu_fan_enabled = enabled;
+                        FansPageData.cb_set_gpu_fan_enabled(enabled);
+                    }
+                }
+            }
+        }
+
+        // Fan curve visualization
+        FanCurveVisualization {
+            vertical-stretch: 1;
+            curve: FansPageData.selected_fan == 0 ? FansPageData.cpu_fan_curve : FansPageData.gpu_fan_curve;
+            curve_color: FansPageData.selected_fan == 0 ? RogTheme.accent-red : RogTheme.accent-purple;
+        }
+
+        // Info text
+        Text {
+            text: "Fan curves show fan speed (PWM %) at different temperature thresholds. Use Reset to restore defaults.";
+            font-size: RogTheme.font-size-sm;
+            color: RogTheme.text-tertiary;
+            horizontal-alignment: center;
+        }
+    }
+}

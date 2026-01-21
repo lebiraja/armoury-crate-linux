@@ -5,8 +5,11 @@ import { RogTheme } from "theme.slint";
 import { SidebarGaming } from "widgets/sidebar_gaming.slint";
 import { PageDashboard, DashboardData } from "pages/dashboard.slint";
 import { PageAbout } from "pages/about.slint";
+import { PageSystem, SystemPageData } from "pages/system.slint";
+import { PageAura, AuraPageData } from "pages/aura.slint";
+import { PageFans, FansPageData, FanCurvePoint } from "pages/fans.slint";
 
-export { DashboardData }
+export { DashboardData, SystemPageData, AuraPageData, FansPageData, FanCurvePoint }
 
 export component MainWindow inherits Window {
     title: "Armoury Crate Linux";
@@ -15,6 +18,27 @@ export component MainWindow inherits Window {
     min-height: 700px;
     preferred-width: 1280px;
     preferred-height: 800px;
+
+    // Toast message state
+    property <string> toast-message: "";
+    property <bool> toast-visible: false;
+
+    // Show toast notification
+    public function show_toast(message: string) {
+        toast-message = message;
+        toast-visible = true;
+        toast-timer.running = true;
+    }
+
+    // Timer to hide toast
+    toast-timer := Timer {
+        interval: 3000ms;
+        running: false;
+        triggered => {
+            toast-visible = false;
+            self.running = false;
+        }
+    }
 
     // Sidebar navigation items
     property <[string]> sidebar-items: [
@@ -43,165 +67,150 @@ export component MainWindow inherits Window {
     // Currently selected page
     property <int> current-page: 0;
 
-    HorizontalLayout {
-        // Sidebar navigation
-        sidebar := SidebarGaming {
-            items: sidebar-items;
-            available: sidebar-items-available;
-            current-item <=> current-page;
+    VerticalLayout {
+        HorizontalLayout {
+            vertical-stretch: 1;
 
-            item-clicked(idx) => {
-                current-page = idx;
+            // Sidebar navigation
+            sidebar := SidebarGaming {
+                items: sidebar-items;
+                available: sidebar-items-available;
+                current-item <=> current-page;
+
+                item-clicked(idx) => {
+                    current-page = idx;
+                }
+            }
+
+            // Main content area
+            Rectangle {
+                background: RogTheme.bg-primary;
+                horizontal-stretch: 1;
+
+                // Dashboard page
+                if current-page == 0: PageDashboard {
+                    width: 100%;
+                    height: 100%;
+                }
+
+                // System Control page
+                if current-page == 1: PageSystem {
+                    width: 100%;
+                    height: 100%;
+                }
+
+                // Scenario Profiles placeholder
+                if current-page == 2: Rectangle {
+                    background: RogTheme.bg-primary;
+
+                    VerticalLayout {
+                        padding: RogTheme.spacing-lg;
+
+                        Text {
+                            text: "Scenario Profiles";
+                            font-size: RogTheme.font-size-h1;
+                            font-weight: 700;
+                            color: RogTheme.text-primary;
+                        }
+
+                        Text {
+                            text: "Per-application automatic profile switching.\nComing soon!";
+                            font-size: RogTheme.font-size-body;
+                            color: RogTheme.text-secondary;
+                        }
+                    }
+                }
+
+                // Aura RGB page
+                if current-page == 3: PageAura {
+                    width: 100%;
+                    height: 100%;
+                }
+
+                // AniMe Matrix placeholder
+                if current-page == 4: Rectangle {
+                    background: RogTheme.bg-primary;
+
+                    VerticalLayout {
+                        padding: RogTheme.spacing-lg;
+
+                        Text {
+                            text: "AniMe Matrix";
+                            font-size: RogTheme.font-size-h1;
+                            font-weight: 700;
+                            color: RogTheme.text-primary;
+                        }
+
+                        Text {
+                            text: "AniMe Matrix display control.\nComing soon!";
+                            font-size: RogTheme.font-size-body;
+                            color: RogTheme.text-secondary;
+                        }
+                    }
+                }
+
+                // Fan Curves page
+                if current-page == 5: PageFans {
+                    width: 100%;
+                    height: 100%;
+                }
+
+                // Settings placeholder
+                if current-page == 6: Rectangle {
+                    background: RogTheme.bg-primary;
+
+                    VerticalLayout {
+                        padding: RogTheme.spacing-lg;
+
+                        Text {
+                            text: "Settings";
+                            font-size: RogTheme.font-size-h1;
+                            font-weight: 700;
+                            color: RogTheme.text-primary;
+                        }
+
+                        Text {
+                            text: "Application settings and preferences.\nComing in next update.";
+                            font-size: RogTheme.font-size-body;
+                            color: RogTheme.text-secondary;
+                        }
+                    }
+                }
+
+                // About page
+                if current-page == 7: PageAbout {
+                    width: 100%;
+                    height: 100%;
+                }
             }
         }
 
-        // Main content area
-        Rectangle {
-            background: RogTheme.bg-primary;
-            horizontal-stretch: 1;
+        // Toast notification bar at bottom
+        if toast-visible: Rectangle {
+            height: 48px;
+            background: RogTheme.bg-card;
+            border-width: 1px;
+            border-color: RogTheme.accent-cyan.with-alpha(0.3);
 
-            // Dashboard page
-            if current-page == 0: PageDashboard {
-                width: 100%;
-                height: 100%;
-            }
+            HorizontalLayout {
+                padding-left: RogTheme.spacing-lg;
+                padding-right: RogTheme.spacing-lg;
+                spacing: RogTheme.spacing-sm;
+                alignment: center;
 
-            // System Control placeholder
-            if current-page == 1: Rectangle {
-                background: RogTheme.bg-primary;
-
-                VerticalLayout {
-                    padding: RogTheme.spacing-lg;
-
-                    Text {
-                        text: "System Control";
-                        font-size: RogTheme.font-size-h1;
-                        font-weight: 700;
-                        color: RogTheme.text-primary;
-                    }
-
-                    Text {
-                        text: "Platform profiles, power settings, and display controls.\nComing in next update.";
-                        font-size: RogTheme.font-size-body;
-                        color: RogTheme.text-secondary;
-                    }
+                Text {
+                    text: "✓";
+                    font-size: RogTheme.font-size-h3;
+                    color: RogTheme.accent-cyan;
+                    vertical-alignment: center;
                 }
-            }
 
-            // Scenario Profiles placeholder
-            if current-page == 2: Rectangle {
-                background: RogTheme.bg-primary;
-
-                VerticalLayout {
-                    padding: RogTheme.spacing-lg;
-
-                    Text {
-                        text: "Scenario Profiles";
-                        font-size: RogTheme.font-size-h1;
-                        font-weight: 700;
-                        color: RogTheme.text-primary;
-                    }
-
-                    Text {
-                        text: "Per-application automatic profile switching.\nComing soon!";
-                        font-size: RogTheme.font-size-body;
-                        color: RogTheme.text-secondary;
-                    }
+                Text {
+                    text: toast-message;
+                    font-size: RogTheme.font-size-body;
+                    color: RogTheme.text-primary;
+                    vertical-alignment: center;
                 }
-            }
-
-            // Aura RGB placeholder
-            if current-page == 3: Rectangle {
-                background: RogTheme.bg-primary;
-
-                VerticalLayout {
-                    padding: RogTheme.spacing-lg;
-
-                    Text {
-                        text: "Aura RGB";
-                        font-size: RogTheme.font-size-h1;
-                        font-weight: 700;
-                        color: RogTheme.text-primary;
-                    }
-
-                    Text {
-                        text: "RGB keyboard lighting control.\nComing in next update.";
-                        font-size: RogTheme.font-size-body;
-                        color: RogTheme.text-secondary;
-                    }
-                }
-            }
-
-            // AniMe Matrix placeholder
-            if current-page == 4: Rectangle {
-                background: RogTheme.bg-primary;
-
-                VerticalLayout {
-                    padding: RogTheme.spacing-lg;
-
-                    Text {
-                        text: "AniMe Matrix";
-                        font-size: RogTheme.font-size-h1;
-                        font-weight: 700;
-                        color: RogTheme.text-primary;
-                    }
-
-                    Text {
-                        text: "AniMe Matrix display control.\nComing soon!";
-                        font-size: RogTheme.font-size-body;
-                        color: RogTheme.text-secondary;
-                    }
-                }
-            }
-
-            // Fan Curves placeholder
-            if current-page == 5: Rectangle {
-                background: RogTheme.bg-primary;
-
-                VerticalLayout {
-                    padding: RogTheme.spacing-lg;
-
-                    Text {
-                        text: "Fan Curves";
-                        font-size: RogTheme.font-size-h1;
-                        font-weight: 700;
-                        color: RogTheme.text-primary;
-                    }
-
-                    Text {
-                        text: "Custom fan curve configuration.\nComing in next update.";
-                        font-size: RogTheme.font-size-body;
-                        color: RogTheme.text-secondary;
-                    }
-                }
-            }
-
-            // Settings placeholder
-            if current-page == 6: Rectangle {
-                background: RogTheme.bg-primary;
-
-                VerticalLayout {
-                    padding: RogTheme.spacing-lg;
-
-                    Text {
-                        text: "Settings";
-                        font-size: RogTheme.font-size-h1;
-                        font-weight: 700;
-                        color: RogTheme.text-primary;
-                    }
-
-                    Text {
-                        text: "Application settings and preferences.\nComing in next update.";
-                        font-size: RogTheme.font-size-body;
-                        color: RogTheme.text-secondary;
-                    }
-                }
-            }
-
-            // About page
-            if current-page == 7: PageAbout {
-                width: 100%;
-                height: 100%;
             }
         }
     }
