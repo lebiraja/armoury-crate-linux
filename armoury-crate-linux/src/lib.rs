@@ -12,6 +12,7 @@
 pub mod config;
 pub mod error;
 pub mod monitoring;
+pub mod types;
 pub mod ui;
 
 // Re-export slint for external use

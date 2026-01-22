@@ -1,218 +1,249 @@
-//! Aura RGB page setup - LED mode, brightness, color controls
+//! Aura RGB page setup
 //!
 //! Connects the Aura page UI to D-Bus Aura interface.
 
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use slint::ComponentHandle;
 
+use crate::ui::show_toast;
 use crate::{AuraPageData, MainWindow};
+use rog_aura::{AuraModeNum, LedBrightness};
+use rog_dbus::zbus_aura::AuraProxy;
 
-/// Initial setup for aura page - fetches current values from D-Bus
-pub fn setup_aura_page(ui: &MainWindow) {
-    // Connect to system bus (blocking for initial setup)
-    let conn = match zbus::blocking::Connection::system() {
-        Ok(c) => c,
-        Err(e) => {
-            error!("D-Bus system connection failed: {:?}", e);
-            return;
+/// Find the first available Aura D-Bus interface
+async fn find_aura_iface(
+    conn: &zbus::Connection,
+) -> Result<AuraProxy<'static>, Box<dyn std::error::Error>> {
+    let f = zbus::fdo::ObjectManagerProxy::new(conn, "xyz.ljones.Asusd", "/").await?;
+    let interfaces = f.get_managed_objects().await?;
+    let mut aura_paths = Vec::new();
+
+    for (path, iface_map) in interfaces.iter() {
+        if iface_map.contains_key("xyz.ljones.Asusd.Aura") {
+            aura_paths.push(path.clone());
         }
-    };
-
-    // Try to get Aura proxy
-    let aura = match rog_dbus::zbus_aura::AuraProxyBlocking::new(&conn) {
-        Ok(a) => a,
-        Err(e) => {
-            warn!("AuraProxy failed: {:?}", e);
-            ui.global::<AuraPageData>().set_aura_available(false);
-            return;
-        }
-    };
-
-    ui.global::<AuraPageData>().set_aura_available(true);
-    let aura_data = ui.global::<AuraPageData>();
-
-    // Load brightness
-    if let Ok(brightness) = aura.brightness() {
-        debug!("Aura brightness: {:?}", brightness);
-        aura_data.set_brightness(brightness as i32);
     }
 
-    // Load LED mode data
-    if let Ok(mode_data) = aura.led_mode_data() {
-        debug!("LED mode data: {:?}", mode_data);
-        aura_data.set_led_mode(mode_data.mode as i32);
-        aura_data.set_led_speed(mode_data.speed as i32);
-
-        // Set color from mode data
-        aura_data.set_color_r(mode_data.colour1.r as i32);
-        aura_data.set_color_g(mode_data.colour1.g as i32);
-        aura_data.set_color_b(mode_data.colour1.b as i32);
+    if aura_paths.is_empty() {
+        return Err("No Aura interfaces found".into());
     }
 
-    // Load supported modes
-    if let Ok(modes) = aura.supported_basic_modes() {
-        debug!("Supported modes: {:?}", modes);
-        let mode_names: Vec<slint::SharedString> = modes
-            .iter()
-            .map(|m| format!("{:?}", m).into())
-            .collect();
-        aura_data.set_available_modes(slint::ModelRc::new(slint::VecModel::from(mode_names)));
-    }
-
-    info!("Aura page initialized");
+    // Use the first available interface - convert to OwnedObjectPath for 'static lifetime
+    let aura_path: zbus::zvariant::OwnedObjectPath = aura_paths[0].clone().into();
+    debug!("Using Aura interface at: {}", aura_path);
+    let proxy = AuraProxy::builder(conn)
+        .path(aura_path)?
+        .build()
+        .await?;
+    Ok(proxy)
 }
 
-/// Setup async callbacks for aura page
-pub fn setup_aura_page_callbacks(ui: &MainWindow) {
-    let handle = ui.as_weak();
+pub fn setup_aura_page(ui: &MainWindow) {
+    let handle_weak = ui.as_weak();
 
     tokio::spawn(async move {
-        // Create async connection
         let conn = match zbus::Connection::system().await {
             Ok(c) => c,
             Err(e) => {
-                error!("D-Bus system connection failed: {:?}", e);
+                error!("Failed to connect to D-Bus: {:?}", e);
                 return;
             }
         };
 
-        // Get Aura proxy
-        let aura = match rog_dbus::zbus_aura::AuraProxy::new(&conn).await {
-            Ok(a) => a,
+        let aura = match find_aura_iface(&conn).await {
+            Ok(proxy) => proxy,
             Err(e) => {
-                warn!("AuraProxy failed: {:?}", e);
+                warn!("Aura interface not available: {}", e);
+                let h = handle_weak.clone();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(ui) = h.upgrade() {
+                        ui.global::<AuraPageData>().set_aura_available(false);
+                    }
+                });
+                return;
+            }
+        };
+
+        // Mark Aura as available
+        let h = handle_weak.clone();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(ui) = h.upgrade() {
+                ui.global::<AuraPageData>().set_aura_available(true);
+            }
+        });
+
+        // 1. Load current brightness
+        if let Ok(brightness) = aura.brightness().await {
+            let brightness_val = brightness as i32;
+            let h = handle_weak.clone();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = h.upgrade() {
+                    ui.global::<AuraPageData>().set_brightness(brightness_val);
+                }
+            });
+        }
+
+        // 2. Load current LED mode and data
+        if let Ok(mode_data) = aura.led_mode_data().await {
+            let h = handle_weak.clone();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = h.upgrade() {
+                    // Set LED mode and properties from mode_data
+                    ui.global::<AuraPageData>().set_led_mode(i32::from(mode_data.mode));
+                    ui.global::<AuraPageData>().set_led_speed(mode_data.speed as i32);
+                    ui.global::<AuraPageData>().set_color_r(mode_data.colour1.r as i32);
+                    ui.global::<AuraPageData>().set_color_g(mode_data.colour1.g as i32);
+                    ui.global::<AuraPageData>().set_color_b(mode_data.colour1.b as i32);
+                }
+            });
+        }
+
+        // Note: The UI currently only supports basic mode selection via cb_led_mode callback
+        // Additional mode support could be added to the Slint UI in the future
+    });
+}
+
+pub fn setup_aura_page_callbacks(ui: &MainWindow) {
+    let handle = ui.as_weak();
+    let handle_weak = handle.clone();
+
+    tokio::spawn(async move {
+        let conn = match zbus::Connection::system().await {
+            Ok(c) => c,
+            Err(e) => {
+                error!("Failed to connect to D-Bus for callbacks: {:?}", e);
+                return;
+            }
+        };
+
+        let aura = match find_aura_iface(&conn).await {
+            Ok(proxy) => proxy,
+            Err(e) => {
+                warn!("Aura interface not available for callbacks: {}", e);
                 return;
             }
         };
 
         let aura_copy = aura.clone();
-        let handle_copy = handle.clone();
+        let handle_for_callbacks = handle.clone();
 
-        let _ = handle.upgrade_in_event_loop(move |ui| {
-            // Brightness callback
-            let aura_inner = aura_copy.clone();
-            let handle_inner = handle_copy.clone();
-            ui.global::<AuraPageData>().on_cb_brightness(move |brightness| {
-                let proxy = aura_inner.clone();
-                let h = handle_inner.clone();
-                tokio::spawn(async move {
-                    let bright_enum = match brightness {
-                        0 => rog_aura::LedBrightness::Off,
-                        1 => rog_aura::LedBrightness::Low,
-                        2 => rog_aura::LedBrightness::Med,
-                        3 => rog_aura::LedBrightness::High,
-                        _ => rog_aura::LedBrightness::Med,
-                    };
-                    match proxy.set_brightness(bright_enum).await {
-                        Ok(_) => {
-                            let msg: slint::SharedString =
-                                format!("Brightness set to {:?}", bright_enum).into();
-                            let _ = slint::invoke_from_event_loop(move || {
-                                if let Some(ui) = h.upgrade() {
-                                    ui.invoke_show_toast(msg);
-                                }
-                            });
-                        }
-                        Err(e) => {
-                            warn!("Failed to set brightness: {:?}", e);
-                        }
-                    }
-                });
-            });
-
-            // LED mode callback
-            let aura_inner = aura_copy.clone();
-            let handle_inner = handle_copy.clone();
-            ui.global::<AuraPageData>().on_cb_led_mode(move |mode| {
-                let proxy = aura_inner.clone();
-                let h = handle_inner.clone();
-                tokio::spawn(async move {
-                    // Get current mode data and update just the mode
-                    if let Ok(mut mode_data) = proxy.led_mode_data().await {
-                        mode_data.mode = rog_aura::AuraModeNum::from(mode as u8);
-                        match proxy.set_led_mode_data(mode_data).await {
-                            Ok(_) => {
-                                let msg: slint::SharedString = "LED mode updated".into();
-                                let _ = slint::invoke_from_event_loop(move || {
-                                    if let Some(ui) = h.upgrade() {
-                                        ui.invoke_show_toast(msg);
-                                    }
-                                });
-                            }
-                            Err(e) => {
-                                warn!("Failed to set LED mode: {:?}", e);
-                            }
-                        }
-                    }
-                });
-            });
-
-            // Color callback
-            let aura_inner = aura_copy.clone();
-            let handle_inner = handle_copy.clone();
-            ui.global::<AuraPageData>()
-                .on_cb_color(move |r, g, b| {
-                    let proxy = aura_inner.clone();
-                    let h = handle_inner.clone();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(ui) = handle_weak.upgrade() {
+                // Brightness callback
+                let proxy = aura_copy.clone();
+                let h = handle_for_callbacks.clone();
+                ui.global::<AuraPageData>().on_cb_brightness(move |value| {
+                    let p = proxy.clone();
+                    let h_inner = h.clone();
                     tokio::spawn(async move {
-                        if let Ok(mut mode_data) = proxy.led_mode_data().await {
-                            // Update color
-                            mode_data.colour1 = rog_aura::Colour {
-                                r: r as u8,
-                                g: g as u8,
-                                b: b as u8,
-                            };
-                            match proxy.set_led_mode_data(mode_data).await {
-                                Ok(_) => {
-                                    let _ = slint::invoke_from_event_loop(move || {
-                                        if let Some(ui) = h.upgrade() {
-                                            ui.invoke_show_toast("Color updated".into());
-                                        }
-                                    });
-                                }
-                                Err(e) => {
-                                    warn!("Failed to set color: {:?}", e);
-                                }
-                            }
+                        let brightness = match value {
+                            0 => LedBrightness::Off,
+                            1 => LedBrightness::Low,
+                            2 => LedBrightness::Med,
+                            3 => LedBrightness::High,
+                            _ => LedBrightness::Med,
+                        };
+                        let res = p.set_brightness(brightness).await;
+                        show_toast(
+                            format!("Brightness: {:?}", brightness).into(),
+                            "Failed to set brightness".into(),
+                            h_inner,
+                            res,
+                        );
+                    });
+                });
+
+                // LED Mode callback
+                let proxy = aura_copy.clone();
+                let h = handle_for_callbacks.clone();
+                ui.global::<AuraPageData>().on_cb_led_mode(move |mode_index| {
+                    let p = proxy.clone();
+                    let h_inner = h.clone();
+                    tokio::spawn(async move {
+                        let mode: AuraModeNum = (mode_index as i32).into();
+                        // Get current mode data to preserve color and speed
+                        if let Ok(mut mode_data) = p.led_mode_data().await {
+                            mode_data.mode = mode;
+                            let res = p.set_led_mode_data(mode_data).await;
+                            show_toast(
+                                format!("LED mode: {:?}", mode).into(),
+                                "Failed to set LED mode".into(),
+                                h_inner,
+                                res,
+                            );
                         }
                     });
                 });
 
-            // Speed callback
-            let aura_inner = aura_copy.clone();
-            ui.global::<AuraPageData>().on_cb_speed(move |speed| {
-                let proxy = aura_inner.clone();
-                tokio::spawn(async move {
-                    if let Ok(mut mode_data) = proxy.led_mode_data().await {
-                        mode_data.speed = match speed {
+                // LED Speed callback
+                let proxy = aura_copy.clone();
+                let h = handle_for_callbacks.clone();
+                ui.global::<AuraPageData>().on_cb_speed(move |speed_index| {
+                    let p = proxy.clone();
+                    let h_inner = h.clone();
+                    tokio::spawn(async move {
+                        let speed = match speed_index {
                             0 => rog_aura::Speed::Low,
                             1 => rog_aura::Speed::Med,
                             2 => rog_aura::Speed::High,
                             _ => rog_aura::Speed::Med,
                         };
-                        let _ = proxy.set_led_mode_data(mode_data).await;
-                    }
+                        if let Ok(mut mode_data) = p.led_mode_data().await {
+                            mode_data.speed = speed;
+                            let res = p.set_led_mode_data(mode_data).await;
+                            show_toast(
+                                format!("Speed: {:?}", speed).into(),
+                                "Failed to set speed".into(),
+                                h_inner,
+                                res,
+                            );
+                        }
+                    });
                 });
-            });
+
+                // Color callback
+                let proxy = aura_copy.clone();
+                let h = handle_for_callbacks.clone();
+                ui.global::<AuraPageData>().on_cb_color(move |r, g, b| {
+                    let p = proxy.clone();
+                    let h_inner = h.clone();
+                    tokio::spawn(async move {
+                        if let Ok(mut mode_data) = p.led_mode_data().await {
+                            mode_data.colour1 = rog_aura::Colour {
+                                r: r as u8,
+                                g: g as u8,
+                                b: b as u8,
+                            };
+                            let res = p.set_led_mode_data(mode_data).await;
+                            show_toast(
+                                format!("Color: RGB({}, {}, {})", r, g, b).into(),
+                                "Failed to set color".into(),
+                                h_inner,
+                                res,
+                            );
+                        }
+                    });
+                });
+        }
         });
 
-        // Setup signal listeners
-        let handle_copy = handle.clone();
+        // 4. Setup Signal Listeners for LED mode changes
         let aura_copy = aura.clone();
+        let h = handle.clone();
         tokio::spawn(async move {
-            let mut stream = aura_copy.receive_led_mode_data_changed().await;
             use futures_util::StreamExt;
+            let mut stream = aura_copy.receive_led_mode_data_changed().await;
             while let Some(event) = stream.next().await {
-                if let Ok(mode_data) = event.get().await {
-                    let h = handle_copy.clone();
+                if let Ok(value) = event.get().await {
+                    let h_inner = h.clone();
                     let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(ui) = h.upgrade() {
-                            let aura_data = ui.global::<AuraPageData>();
-                            aura_data.set_led_mode(mode_data.mode as i32);
-                            aura_data.set_led_speed(mode_data.speed as i32);
-                            aura_data.set_color_r(mode_data.colour1.r as i32);
-                            aura_data.set_color_g(mode_data.colour1.g as i32);
-                            aura_data.set_color_b(mode_data.colour1.b as i32);
+                        if let Some(ui) = h_inner.upgrade() {
+                            // Update UI with new effect data
+                            ui.global::<AuraPageData>().set_led_mode(i32::from(value.mode));
+                            ui.global::<AuraPageData>().set_led_speed(value.speed as i32);
+                            ui.global::<AuraPageData>().set_color_r(value.colour1.r as i32);
+                            ui.global::<AuraPageData>().set_color_g(value.colour1.g as i32);
+                            ui.global::<AuraPageData>().set_color_b(value.colour1.b as i32);
                         }
                     });
                 }

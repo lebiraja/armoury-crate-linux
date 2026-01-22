@@ -9,6 +9,10 @@ repository.workspace = true
 homepage.workspace = true
 edition.workspace = true
 
+[[bin]]
+name = "armoury-crate-linux"
+path = "src/main.rs"
+
 [features]
 default = []
 mocking = []

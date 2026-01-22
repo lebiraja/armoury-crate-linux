@@ -7,9 +7,11 @@
 //! - Fan RPM readings
 //! - Power consumption
 
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use log::debug;
 use sysinfo::System;
 use tokio::sync::RwLock;
 
@@ -87,11 +89,204 @@ impl MonitoringHistory {
     }
 }
 
+/// Cached hwmon paths for faster reading
+struct HwmonPaths {
+    cpu_temp_path: Option<String>,
+    gpu_temp_path: Option<String>,
+    gpu_busy_path: Option<String>,
+    fan_paths: Vec<String>,
+}
+
+impl HwmonPaths {
+    fn new() -> Self {
+        let mut paths = Self {
+            cpu_temp_path: None,
+            gpu_temp_path: None,
+            gpu_busy_path: None,
+            fan_paths: Vec::new(),
+        };
+        paths.discover();
+        paths
+    }
+
+    /// Discover hwmon paths by reading the 'name' attribute
+    fn discover(&mut self) {
+        let hwmon_base = Path::new("/sys/class/hwmon");
+
+        if let Ok(entries) = std::fs::read_dir(hwmon_base) {
+            for entry in entries.flatten() {
+                let hwmon_path = entry.path();
+                let name_path = hwmon_path.join("name");
+
+                if let Ok(name) = std::fs::read_to_string(&name_path) {
+                    let name = name.trim();
+                    debug!("Found hwmon device: {} = {}", hwmon_path.display(), name);
+
+                    match name {
+                        // AMD CPU temperature sensors
+                        "k10temp" | "zenpower" => {
+                            // Tdie is usually temp1 for k10temp, temp2 for zenpower
+                            let temp1 = hwmon_path.join("temp1_input");
+                            let temp2 = hwmon_path.join("temp2_input");
+                            if temp1.exists() {
+                                self.cpu_temp_path = Some(temp1.to_string_lossy().to_string());
+                                debug!("CPU temp path (AMD): {:?}", self.cpu_temp_path);
+                            } else if temp2.exists() {
+                                self.cpu_temp_path = Some(temp2.to_string_lossy().to_string());
+                                debug!("CPU temp path (AMD): {:?}", self.cpu_temp_path);
+                            }
+                        }
+                        // Intel CPU temperature sensor
+                        "coretemp" => {
+                            // Package temp is usually temp1
+                            let temp1 = hwmon_path.join("temp1_input");
+                            if temp1.exists() {
+                                self.cpu_temp_path = Some(temp1.to_string_lossy().to_string());
+                                debug!("CPU temp path (Intel): {:?}", self.cpu_temp_path);
+                            }
+                        }
+                        // AMD GPU
+                        "amdgpu" => {
+                            let temp1 = hwmon_path.join("temp1_input");
+                            if temp1.exists() {
+                                self.gpu_temp_path = Some(temp1.to_string_lossy().to_string());
+                                debug!("GPU temp path (AMD): {:?}", self.gpu_temp_path);
+                            }
+                            // GPU busy percent for usage
+                            // This is in the device path, not hwmon
+                            if let Some(_device) = hwmon_path.join("device").read_link().ok() {
+                                let busy_path = hwmon_path
+                                    .join("device")
+                                    .join("gpu_busy_percent");
+                                if busy_path.exists() {
+                                    self.gpu_busy_path =
+                                        Some(busy_path.to_string_lossy().to_string());
+                                    debug!("GPU busy path: {:?}", self.gpu_busy_path);
+                                }
+                            }
+                        }
+                        // NVIDIA GPU (nouveau driver)
+                        "nouveau" => {
+                            let temp1 = hwmon_path.join("temp1_input");
+                            if temp1.exists() {
+                                self.gpu_temp_path = Some(temp1.to_string_lossy().to_string());
+                                debug!("GPU temp path (nouveau): {:?}", self.gpu_temp_path);
+                            }
+                        }
+                        // ASUS custom fan curve driver
+                        "asus_custom_fan_curve" | "asus-nb-wmi" => {
+                            // Look for fan inputs
+                            for i in 1..=4 {
+                                let fan_path = hwmon_path.join(format!("fan{}_input", i));
+                                if fan_path.exists() {
+                                    self.fan_paths.push(fan_path.to_string_lossy().to_string());
+                                    debug!("Fan path: {}", fan_path.display());
+                                }
+                            }
+                        }
+                        _ => {
+                            // Check for fans in any hwmon device
+                            for i in 1..=4 {
+                                let fan_path = hwmon_path.join(format!("fan{}_input", i));
+                                if fan_path.exists()
+                                    && !self.fan_paths.contains(
+                                        &fan_path.to_string_lossy().to_string(),
+                                    )
+                                {
+                                    self.fan_paths.push(fan_path.to_string_lossy().to_string());
+                                    debug!("Fan path (other): {}", fan_path.display());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback for CPU temp if not found via hwmon name
+        if self.cpu_temp_path.is_none() {
+            // Try thermal zones
+            for i in 0..10 {
+                let tz_path = format!("/sys/class/thermal/thermal_zone{}/temp", i);
+                let tz_type = format!("/sys/class/thermal/thermal_zone{}/type", i);
+                if let Ok(tz_type_content) = std::fs::read_to_string(&tz_type) {
+                    let tz_type_name = tz_type_content.trim();
+                    // Look for x86_pkg_temp or TCPU
+                    if tz_type_name.contains("x86_pkg")
+                        || tz_type_name.contains("cpu")
+                        || tz_type_name.contains("CPU")
+                    {
+                        if Path::new(&tz_path).exists() {
+                            self.cpu_temp_path = Some(tz_path);
+                            debug!("CPU temp path (thermal_zone): {:?}", self.cpu_temp_path);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Last resort fallback for CPU temp
+        if self.cpu_temp_path.is_none() {
+            let tz0 = "/sys/class/thermal/thermal_zone0/temp";
+            if Path::new(tz0).exists() {
+                self.cpu_temp_path = Some(tz0.to_string());
+                debug!("CPU temp path (fallback): {:?}", self.cpu_temp_path);
+            }
+        }
+    }
+
+    fn read_cpu_temp(&self) -> Option<f32> {
+        if let Some(ref path) = self.cpu_temp_path {
+            if let Ok(content) = std::fs::read_to_string(path) {
+                if let Ok(temp) = content.trim().parse::<f32>() {
+                    return Some(temp / 1000.0);
+                }
+            }
+        }
+        None
+    }
+
+    fn read_gpu_temp(&self) -> Option<f32> {
+        if let Some(ref path) = self.gpu_temp_path {
+            if let Ok(content) = std::fs::read_to_string(path) {
+                if let Ok(temp) = content.trim().parse::<f32>() {
+                    return Some(temp / 1000.0);
+                }
+            }
+        }
+        None
+    }
+
+    fn read_gpu_usage(&self) -> Option<f32> {
+        if let Some(ref path) = self.gpu_busy_path {
+            if let Ok(content) = std::fs::read_to_string(path) {
+                if let Ok(usage) = content.trim().parse::<f32>() {
+                    return Some(usage);
+                }
+            }
+        }
+        None
+    }
+
+    fn read_fan_rpm(&self) -> Vec<u32> {
+        self.fan_paths
+            .iter()
+            .filter_map(|path| {
+                std::fs::read_to_string(path)
+                    .ok()
+                    .and_then(|s| s.trim().parse::<u32>().ok())
+            })
+            .collect()
+    }
+}
+
 /// System monitor that collects hardware metrics
 pub struct SystemMonitor {
     data: Arc<RwLock<MonitoringData>>,
     history: Arc<RwLock<MonitoringHistory>>,
     sys: Arc<RwLock<System>>,
+    hwmon: Arc<RwLock<HwmonPaths>>,
     update_interval: Duration,
     running: Arc<RwLock<bool>>,
 }
@@ -109,6 +304,7 @@ impl SystemMonitor {
             data: Arc::new(RwLock::new(MonitoringData::default())),
             history: Arc::new(RwLock::new(MonitoringHistory::new(max_entries))),
             sys: Arc::new(RwLock::new(System::new_all())),
+            hwmon: Arc::new(RwLock::new(HwmonPaths::new())),
             update_interval: Duration::from_millis(update_interval_ms),
             running: Arc::new(RwLock::new(false)),
         }
@@ -119,6 +315,7 @@ impl SystemMonitor {
         let data = self.data.clone();
         let history = self.history.clone();
         let sys = self.sys.clone();
+        let hwmon = self.hwmon.clone();
         let interval = self.update_interval;
         let running = self.running.clone();
 
@@ -145,7 +342,8 @@ impl SystemMonitor {
                 // Collect metrics
                 let new_data = {
                     let sys = sys.read().await;
-                    collect_metrics(&sys)
+                    let hwmon = hwmon.read().await;
+                    collect_metrics(&sys, &hwmon)
                 };
 
                 // Update data and history
@@ -184,7 +382,7 @@ impl SystemMonitor {
 }
 
 /// Collect system metrics from sysinfo
-fn collect_metrics(sys: &System) -> MonitoringData {
+fn collect_metrics(sys: &System, hwmon: &HwmonPaths) -> MonitoringData {
     // Calculate CPU usage from global CPU info
     let cpu_usage = sys.global_cpu_info().cpu_usage();
 
@@ -206,14 +404,15 @@ fn collect_metrics(sys: &System) -> MonitoringData {
         0.0
     };
 
-    // CPU temperature - try to read from hwmon
-    let cpu_temp = read_cpu_temperature().unwrap_or(0.0);
+    // CPU temperature from cached hwmon path
+    let cpu_temp = hwmon.read_cpu_temp().unwrap_or(0.0);
 
-    // GPU temperature and usage - try to read from hwmon
-    let (gpu_temp, gpu_usage) = read_gpu_metrics().unwrap_or((0.0, 0.0));
+    // GPU temperature and usage from cached hwmon paths
+    let gpu_temp = hwmon.read_gpu_temp().unwrap_or(0.0);
+    let gpu_usage = hwmon.read_gpu_usage().unwrap_or(0.0);
 
     // Fan RPM readings
-    let fan_rpm = read_fan_rpm().unwrap_or_default();
+    let fan_rpm = hwmon.read_fan_rpm();
 
     MonitoringData {
         cpu_usage,
@@ -232,92 +431,22 @@ fn collect_metrics(sys: &System) -> MonitoringData {
     }
 }
 
-/// Read CPU temperature from hwmon
-fn read_cpu_temperature() -> Option<f32> {
-    // Try common hwmon paths for CPU temperature
-    let paths = [
-        "/sys/class/hwmon/hwmon0/temp1_input",
-        "/sys/class/hwmon/hwmon1/temp1_input",
-        "/sys/class/hwmon/hwmon2/temp1_input",
-        "/sys/class/thermal/thermal_zone0/temp",
-    ];
-
-    for path in paths {
-        if let Ok(content) = std::fs::read_to_string(path) {
-            if let Ok(temp) = content.trim().parse::<f32>() {
-                // hwmon reports in millidegrees, thermal_zone in millidegrees too
-                return Some(temp / 1000.0);
-            }
-        }
-    }
-    None
-}
-
-/// Read GPU temperature and usage from hwmon or NVIDIA
-fn read_gpu_metrics() -> Option<(f32, f32)> {
-    // Try NVIDIA first via hwmon
-    // Look for amdgpu or nvidia-smi paths
-    let gpu_temp_paths = [
-        "/sys/class/hwmon/hwmon1/temp1_input",
-        "/sys/class/hwmon/hwmon2/temp1_input",
-        "/sys/class/hwmon/hwmon3/temp1_input",
-    ];
-
-    let mut temp = 0.0;
-    for path in gpu_temp_paths {
-        if let Ok(content) = std::fs::read_to_string(path) {
-            if let Ok(t) = content.trim().parse::<f32>() {
-                temp = t / 1000.0;
-                break;
-            }
-        }
-    }
-
-    // GPU usage is harder to get without NVML
-    // Return 0 for now
-    Some((temp, 0.0))
-}
-
-/// Read fan RPM from hwmon
-fn read_fan_rpm() -> Option<Vec<u32>> {
-    let mut rpms = Vec::new();
-
-    // Look for fan inputs in hwmon
-    for hwmon_id in 0..10 {
-        for fan_id in 1..5 {
-            let path = format!("/sys/class/hwmon/hwmon{}/fan{}_input", hwmon_id, fan_id);
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(rpm) = content.trim().parse::<u32>() {
-                    rpms.push(rpm);
-                }
-            }
-        }
-    }
-
-    if rpms.is_empty() {
-        None
-    } else {
-        Some(rpms)
-    }
-}
-
 /// Read battery percentage
 fn read_battery_percent() -> Option<f32> {
-    let path = "/sys/class/power_supply/BAT0/capacity";
-    if let Ok(content) = std::fs::read_to_string(path) {
-        if let Ok(percent) = content.trim().parse::<f32>() {
-            return Some(percent);
+    // Try common battery paths
+    let battery_paths = [
+        "/sys/class/power_supply/BAT0/capacity",
+        "/sys/class/power_supply/BAT1/capacity",
+        "/sys/class/power_supply/BATT/capacity",
+    ];
+
+    for path in battery_paths {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            if let Ok(percent) = content.trim().parse::<f32>() {
+                return Some(percent);
+            }
         }
     }
-
-    // Try BAT1
-    let path = "/sys/class/power_supply/BAT1/capacity";
-    if let Ok(content) = std::fs::read_to_string(path) {
-        if let Ok(percent) = content.trim().parse::<f32>() {
-            return Some(percent);
-        }
-    }
-
     None
 }
 
@@ -326,7 +455,9 @@ fn read_ac_power_status() -> bool {
     let paths = [
         "/sys/class/power_supply/AC/online",
         "/sys/class/power_supply/AC0/online",
+        "/sys/class/power_supply/ADP0/online",
         "/sys/class/power_supply/ADP1/online",
+        "/sys/class/power_supply/ACAD/online",
     ];
 
     for path in paths {
