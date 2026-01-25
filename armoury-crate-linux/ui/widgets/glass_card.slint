@@ -328,3 +328,107 @@ export component SectionHeader inherits Rectangle {
         Rectangle { horizontal-stretch: 1; }
     }
 }
+
+// Slider with tick marks (0%, 25%, 50%, 75%, 100%)
+export component TickSlider inherits Rectangle {
+    in property <string> label;
+    in property <float> value;
+    in property <float> minimum: 0;
+    in property <float> maximum: 4; // Default to 5 steps (0-4)
+    in property <int> ticks: 5;
+    in property <bool> show-labels: false; // Show 0%, 25%... below
+
+    callback changed(float);
+
+    height: 60px;
+    background: transparent;
+
+    VerticalLayout {
+        spacing: 4px;
+
+        // Label
+        Text {
+            text: label;
+            font-size: RogTheme.font-size-body;
+            color: RogTheme.text-primary;
+        }
+
+        // Slider Area
+        Rectangle {
+            height: 30px;
+
+            // Track line
+            Rectangle {
+                height: 2px;
+                width: parent.width;
+                y: 14px;
+                background: RogTheme.glass-border;
+            }
+
+            // Ticks
+            for i in ticks : Rectangle {
+                x: (parent.width - 2px) * i / (ticks - 1);
+                y: 11px;
+                width: 2px;
+                height: 8px;
+                background: RogTheme.glass-border;
+            }
+
+            // Active Track
+            Rectangle {
+                x: 0;
+                y: 14px;
+                width: handle.x;
+                height: 2px;
+                background: RogTheme.accent-cyan;
+            }
+
+            // Handle
+            handle := Rectangle {
+                x: (parent.width - self.width) * (value - minimum) / (maximum - minimum);
+                y: 7px;
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                background: RogTheme.text-primary;
+                border-width: 2px;
+                border-color: RogTheme.bg-primary;
+
+                drop-shadow-color: rgba(0,0,0,0.5);
+                drop-shadow-blur: 4px;
+            }
+
+            // Touch handling
+            TouchArea {
+                moved => {
+                    let raw-val = minimum + (self.mouse-x / parent.width) * (maximum - minimum);
+                    let step = (maximum - minimum) / (ticks - 1);
+                    let snapped-val = round(raw-val / step) * step;
+                    let final-val = clamp(snapped-val, minimum, maximum);
+
+                    if (final-val != value) {
+                        root.changed(final-val);
+                    }
+                }
+                clicked => {
+                    let raw-val = minimum + (self.mouse-x / parent.width) * (maximum - minimum);
+                    let step = (maximum - minimum) / (ticks - 1);
+                    let snapped-val = round(raw-val / step) * step;
+                    let final-val = clamp(snapped-val, minimum, maximum);
+                    root.changed(final-val);
+                }
+            }
+        }
+
+        // Tick Labels (Optional)
+        if show-labels: HorizontalLayout {
+            // Very simplified labels for now - just 0% and 100% or similar could be added here
+            // Implementing spaced labels is tricky without repeater text positioning
+            Text { text: "0%"; font-size: 10px; color: RogTheme.text-tertiary; }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: "50%"; font-size: 10px; color: RogTheme.text-tertiary; }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: "100%"; font-size: 10px; color: RogTheme.text-tertiary; }
+        }
+    }
+}

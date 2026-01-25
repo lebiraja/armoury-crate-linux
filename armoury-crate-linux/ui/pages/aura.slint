@@ -1,10 +1,10 @@
-// Aura RGB control page - Enhanced UI with color wheel, keyboard preview, and animated modes
-// Redesigned with glassmorphism styling
+// Aura RGB control page - Master-Detail Split Layout
+// Redesigned to match Windows Armoury Crate "Aura Effects" style
 
 import { RogTheme } from "../theme.slint";
-import { ColorWheel, ColorPresetsRow } from "../widgets/color_wheel.slint";
+import { ColorWheel } from "../widgets/color_wheel.slint";
 import { KeyboardPreview } from "../widgets/keyboard_preview.slint";
-import { GlassCard, GlassButton, SectionHeader } from "../widgets/glass_card.slint";
+import { GlassCard, GlassButton, TickSlider } from "../widgets/glass_card.slint";
 
 // Aura page data bindings
 export global AuraPageData {
@@ -16,20 +16,6 @@ export global AuraPageData {
 
     // LED mode (AuraModeNum values)
     in-out property <int> led_mode: 0;
-    in-out property <[string]> available_modes: [
-        "Static",      // 0
-        "Breathe",     // 1
-        "RainbowCycle", // 2
-        "RainbowWave", // 3
-        "Star",        // 4
-        "Rain",        // 5
-        "Highlight",   // 6
-        "Laser",       // 7
-        "Ripple",      // 8
-        "Pulse",       // 10
-        "Comet",       // 11
-        "Flash"        // 12
-    ];
     callback cb_led_mode(int);
 
     // LED speed (0=Low, 1=Med, 2=High)
@@ -65,617 +51,287 @@ export global AuraPageData {
     ];
     in-out property <bool> is_loading: true;
     in-out property <string> error_message: "";
+
+    // Helper to get mode name
+    pure callback get_mode_name(int) -> string;
 }
 
-// Compact brightness button (Glass style)
-component BrightnessBtn inherits Rectangle {
-    in property <string> label;
-    in property <string> icon;
-    in property <bool> selected: false;
-    callback clicked();
-
-    width: 64px;
-    height: 56px;
-    background: selected ? RogTheme.accent-cyan.with-alpha(0.2) : RogTheme.glass-bg;
-    border-radius: RogTheme.radius-md;
-    border-width: selected ? 2px : 1px;
-    border-color: selected ? RogTheme.accent-cyan : RogTheme.glass-border;
-
-    drop-shadow-color: selected ? RogTheme.accent-cyan.with-alpha(0.4) : #00000000;
-    drop-shadow-blur: selected ? 10px : 0px;
-
-    states [
-        hover when touch.has-hover && !selected: {
-            background: RogTheme.glass-bg-light;
-            border-color: RogTheme.glass-border-active;
-        }
-    ]
-
-    animate background, border-color { duration: RogTheme.anim-fast; }
-
-    touch := TouchArea { clicked => { root.clicked(); } }
-
-    VerticalLayout {
-        alignment: center;
-        spacing: 2px;
-
-        Text {
-            text: icon;
-            font-size: 20px;
-            horizontal-alignment: center;
-        }
-
-        Text {
-            text: label;
-            font-size: RogTheme.font-size-xs;
-            font-weight: selected ? 600 : 400;
-            color: selected ? RogTheme.accent-cyan : RogTheme.text-secondary;
-            horizontal-alignment: center;
-        }
-    }
-}
-
-// Speed button component (Glass style)
-component SpeedBtn inherits Rectangle {
-    in property <string> label;
-    in property <string> icon;
-    in property <bool> selected: false;
-    callback clicked();
-
-    width: 60px;
-    height: 36px;
-    background: selected ? RogTheme.accent-orange.with-alpha(0.2) : RogTheme.glass-bg;
-    border-radius: RogTheme.radius-sm;
-    border-width: selected ? 2px : 1px;
-    border-color: selected ? RogTheme.accent-orange : RogTheme.glass-border;
-
-    states [
-        hover when touch.has-hover && !selected: {
-            background: RogTheme.glass-bg-light;
-        }
-    ]
-
-    animate background { duration: RogTheme.anim-fast; }
-
-    touch := TouchArea { clicked => { root.clicked(); } }
-
-    HorizontalLayout {
-        alignment: center;
-        spacing: 4px;
-
-        Text {
-            text: icon;
-            font-size: 14px;
-            vertical-alignment: center;
-        }
-
-        Text {
-            text: label;
-            font-size: RogTheme.font-size-xs;
-            font-weight: selected ? 600 : 400;
-            color: selected ? RogTheme.accent-orange : RogTheme.text-secondary;
-            vertical-alignment: center;
-        }
-    }
-}
-
-// Animated mode card (Glass style)
-component AnimatedModeCard inherits Rectangle {
+// Effect Selection Card
+component EffectCard inherits Rectangle {
     in property <string> name;
-    in property <int> mode_id: 0;
+    in property <string> icon-char: "●"; // Simple char icon
     in property <bool> selected: false;
     in property <bool> enabled: true;
-    in property <color> preview_color: RogTheme.accent-cyan;
-
-    // Animation properties for different modes
-    property <float> anim_phase: mod(animation-tick() / 1s, 1);
-    property <float> anim_offset: 0;
 
     callback clicked();
 
-    width: 90px;
-    height: 72px;
-    background: selected ? RogTheme.accent-purple.with-alpha(0.2) : (enabled ? RogTheme.glass-bg : RogTheme.glass-bg.with-alpha(0.3));
-    border-radius: RogTheme.radius-md;
-    border-width: selected ? 2px : 1px;
-    border-color: selected ? RogTheme.accent-purple : (enabled ? RogTheme.glass-border : RogTheme.glass-border.with-alpha(0.3));
-    opacity: enabled ? 1.0 : 0.4;
+    width: 100px;
+    height: 100px;
+    background: transparent;
 
-    drop-shadow-color: selected ? RogTheme.accent-purple.with-alpha(0.5) : #00000000;
-    drop-shadow-blur: selected ? 12px : 0px;
+    // Selection/Hover State
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: RogTheme.radius-md;
+        background: selected ? RogTheme.bg-tertiary : (touch.has-hover && enabled ? RogTheme.bg-tertiary.with-alpha(0.5) : transparent);
+        border-width: selected ? 1px : 0px;
+        border-color: RogTheme.accent-red; // Red selection like reference
 
-    states [
-        hover when touch.has-hover && !selected && enabled: {
-            background: RogTheme.glass-bg-light;
-            border-color: RogTheme.glass-border-active;
-        }
-    ]
-
-    animate background, border-color, drop-shadow-blur { duration: RogTheme.anim-fast; }
-
-    touch := TouchArea {
-        clicked => {
-            if (root.enabled) { root.clicked(); }
-        }
+        animate background { duration: RogTheme.anim-fast; }
     }
 
     VerticalLayout {
         alignment: center;
-        spacing: 6px;
-        padding: 6px;
+        spacing: 8px;
 
-        // Animated preview area
+        // Icon Circle
         Rectangle {
-            width: 64px;
-            height: 28px;
-            border-radius: 4px;
-            clip: true;
-            background: RogTheme.bg-tertiary;
+            width: 48px;
+            height: 48px;
+            border-radius: 24px;
+            background: transparent;
+            border-width: 2px;
+            border-color: selected ? RogTheme.text-primary : RogTheme.text-secondary;
 
-            // Base color layer
-            Rectangle {
-                width: 100%;
-                height: 100%;
-                background: preview_color;
-
-                // Animation overlays based on mode
-                // Static (0) - no animation
-                if mode_id == 0: Rectangle {
-                    width: 100%;
-                    height: 100%;
-                    background: preview_color;
-                }
-
-                // Breathe (1) - opacity pulse
-                if mode_id == 1: Rectangle {
-                    width: 100%;
-                    height: 100%;
-                    background: preview_color;
-                    opacity: 0.3 + 0.7 * (0.5 + 0.5 * cos(anim_phase * 360deg));
-                }
-
-                // Rainbow Cycle (2) - hue rotation
-                if mode_id == 2: Rectangle {
-                    width: 100%;
-                    height: 100%;
-                    background: hsv(anim_phase * 360, 1, 1);
-                }
-
-                // Rainbow Wave (3) - horizontal rainbow gradient
-                if mode_id == 3: Rectangle {
-                    width: 200%;
-                    height: 100%;
-                    x: -anim_phase * parent.width;
-                    background: @linear-gradient(90deg,
-                        hsv(0, 1, 1) 0%,
-                        hsv(60, 1, 1) 16%,
-                        hsv(120, 1, 1) 33%,
-                        hsv(180, 1, 1) 50%,
-                        hsv(240, 1, 1) 66%,
-                        hsv(300, 1, 1) 83%,
-                        hsv(360, 1, 1) 100%
-                    );
-                }
-
-                // Star (4) - twinkle effect
-                if mode_id == 4: Rectangle {
-                    width: 100%;
-                    height: 100%;
-                    background: preview_color;
-                    opacity: mod(anim_phase * 7, 1) > 0.5 ? 1.0 : 0.3;
-                }
-
-                // Rain (5) - vertical moving gradient
-                if mode_id == 5: Rectangle {
-                    width: 100%;
-                    height: 200%;
-                    y: (anim_phase - 1) * parent.height;
-                    background: @linear-gradient(180deg,
-                        transparent 0%,
-                        preview_color 50%,
-                        transparent 100%
-                    );
-                }
-
-                // Highlight (6) - horizontal sweep
-                if mode_id == 6: Rectangle {
-                    width: 100%;
-                    height: 100%;
-                    background: @linear-gradient(90deg,
-                        preview_color.with-alpha(0.3) 0%,
-                        preview_color 50%,
-                        preview_color.with-alpha(0.3) 100%
-                    );
-                    x: (anim_phase - 0.5) * parent.width;
-                }
-
-                // Laser (7) - horizontal beam
-                if mode_id == 7: Rectangle {
-                    width: 20%;
-                    height: 100%;
-                    x: anim_phase * parent.width;
-                    background: @linear-gradient(90deg,
-                        transparent 0%,
-                        preview_color 50%,
-                        transparent 100%
-                    );
-                }
-
-                // Ripple (8) - scale pulse from center
-                if mode_id == 8: Rectangle {
-                    width: 100%;
-                    height: 100%;
-                    background: preview_color;
-                    opacity: 1 - anim_phase;
-                }
-
-                // Pulse (10) - brightness pulse
-                if mode_id == 10: Rectangle {
-                    width: 100%;
-                    height: 100%;
-                    background: preview_color;
-                    opacity: anim_phase < 0.5 ? (anim_phase * 2) : (2 - anim_phase * 2);
-                }
-
-                // Comet (11) - moving streak
-                if mode_id == 11: Rectangle {
-                    width: 40%;
-                    height: 100%;
-                    x: anim_phase * parent.width * 1.5 - parent.width * 0.2;
-                    background: @linear-gradient(90deg,
-                        transparent 0%,
-                        preview_color.with-alpha(0.5) 30%,
-                        preview_color 100%
-                    );
-                }
-
-                // Flash (12) - blink
-                if mode_id == 12: Rectangle {
-                    width: 100%;
-                    height: 100%;
-                    background: preview_color;
-                    opacity: mod(anim_phase * 4, 1) > 0.5 ? 1.0 : 0.0;
-                }
+            Text {
+                text: root.icon-char;
+                font-size: 24px;
+                color: selected ? RogTheme.text-primary : RogTheme.text-secondary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
             }
         }
 
-        // Mode name
         Text {
             text: name;
-            font-size: 11px;
-            font-weight: selected ? 600 : 400;
-            color: selected ? RogTheme.accent-purple : RogTheme.text-primary;
+            font-size: 12px;
+            color: selected ? RogTheme.text-primary : RogTheme.text-secondary;
             horizontal-alignment: center;
-            overflow: elide;
         }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
     }
 }
 
-// Quick color swatch
-component QuickColor inherits Rectangle {
-    in property <color> swatch_color;
-    callback clicked();
+// Gradient Bar for Rainbow modes
+component GradientBar inherits Rectangle {
+    height: 20px;
+    border-radius: 4px;
+    background: @linear-gradient(90deg,
+        #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
 
-    width: 36px;
-    height: 36px;
-    border-radius: RogTheme.radius-sm;
-    background: swatch_color;
     border-width: 1px;
     border-color: RogTheme.glass-border;
-
-    states [
-        hover when touch.has-hover: {
-            border-color: white;
-            border-width: 2px;
-            drop-shadow-blur: 8px;
-        }
-    ]
-
-    drop-shadow-color: swatch_color.with-alpha(0.4);
-    drop-shadow-blur: 0px;
-
-    animate border-color, border-width, drop-shadow-blur { duration: RogTheme.anim-fast; }
-
-    touch := TouchArea { clicked => { root.clicked(); } }
 }
 
 // Main Aura page
 export component PageAura inherits Rectangle {
     background: transparent;
 
-    // Not available state
-    if !AuraPageData.aura_available: Rectangle {
-        VerticalLayout {
-            alignment: center;
-            spacing: RogTheme.spacing-md;
+    VerticalLayout {
+        padding: RogTheme.spacing-lg;
+        spacing: RogTheme.spacing-lg;
 
-            Text {
-                text: "🎨";
-                font-size: 64px;
-                horizontal-alignment: center;
-            }
-
-            Text {
-                text: "Aura RGB Not Available";
-                font-size: RogTheme.font-size-h2;
-                color: RogTheme.text-secondary;
-                horizontal-alignment: center;
-            }
-
-            Text {
-                text: "No Aura-compatible keyboard detected";
-                font-size: RogTheme.font-size-body;
-                color: RogTheme.text-tertiary;
-                horizontal-alignment: center;
-            }
-        }
-    }
-
-    if AuraPageData.aura_available: Rectangle {
-        // Loading State
-        if AuraPageData.is_loading: VerticalLayout {
-            alignment: center;
-            spacing: RogTheme.spacing-md;
-            Text {
-                text: "Loading Aura RGB...";
-                font-size: RogTheme.font-size-h3;
-                color: RogTheme.text-secondary;
-                horizontal-alignment: center;
-            }
+        // Header
+        Text {
+            text: "Aura Sync";
+            font-size: RogTheme.font-size-h1;
+            font-weight: 700;
+            color: RogTheme.text-primary;
         }
 
-        // Error State
-        if !AuraPageData.is_loading && AuraPageData.error_message != "": VerticalLayout {
-            alignment: center;
-            spacing: RogTheme.spacing-md;
-            Text {
-                text: AuraPageData.error_message;
-                font-size: RogTheme.font-size-body;
-                color: RogTheme.danger;
-                horizontal-alignment: center;
+        // Tab Bar (Visual only for now matching ref)
+        HorizontalLayout {
+            spacing: RogTheme.spacing-xl;
+
+            Rectangle {
+                width: 120px;
+                height: 32px;
+
+                Text {
+                    text: "Sync devices";
+                    color: RogTheme.text-secondary;
+                    horizontal-alignment: center;
+                }
             }
+
+            Rectangle {
+                width: 120px;
+                height: 32px;
+
+                Text {
+                    text: "Aura Effects";
+                    color: RogTheme.text-primary;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                }
+
+                // Active Indicator
+                Rectangle {
+                    y: parent.height - 2px;
+                    height: 2px;
+                    width: 100%;
+                    background: RogTheme.accent-cyan; // Cyan highlight like reference
+                }
+            }
+
+            Rectangle { horizontal-stretch: 1; }
         }
 
-        // Main Content
-        if !AuraPageData.is_loading && AuraPageData.error_message == "": Flickable {
-            viewport-height: content.preferred-height;
+        // Main Split Content
+        HorizontalLayout {
+            spacing: RogTheme.spacing-xl;
 
-            content := VerticalLayout {
-                padding: RogTheme.spacing-lg;
-                spacing: RogTheme.spacing-lg;
+            // LEFT PANEL: Basic Effects Grid
+            VerticalLayout {
+                width: 60%;
+                spacing: RogTheme.spacing-md;
 
-                // Header with title and brightness
+                Text {
+                    text: "■ Basic Effects";
+                    color: RogTheme.accent-red;
+                    font-size: RogTheme.font-size-body;
+                    font-weight: 700;
+                }
+
+                // Grid of Effects
+                // Row 1
                 HorizontalLayout {
-                    spacing: RogTheme.spacing-lg;
-                    alignment: space-between;
+                    spacing: RogTheme.spacing-md;
 
+                    EffectCard {
+                        name: "Static";
+                        icon-char: "◎";
+                        selected: AuraPageData.led_mode == 0;
+                        enabled: AuraPageData.mode_enabled[0];
+                        clicked => { AuraPageData.led_mode = 0; AuraPageData.cb_led_mode(0); }
+                    }
+                    EffectCard {
+                        name: "Breathing";
+                        icon-char: "〰";
+                        selected: AuraPageData.led_mode == 1;
+                        enabled: AuraPageData.mode_enabled[1];
+                        clicked => { AuraPageData.led_mode = 1; AuraPageData.cb_led_mode(1); }
+                    }
+                    EffectCard {
+                        name: "Strobing";
+                        icon-char: "✧";
+                        selected: AuraPageData.led_mode == 12; // Flash/Strobe
+                        enabled: AuraPageData.mode_enabled[12];
+                        clicked => { AuraPageData.led_mode = 12; AuraPageData.cb_led_mode(12); }
+                    }
+                    EffectCard {
+                        name: "Color Cycle";
+                        icon-char: "⟳";
+                        selected: AuraPageData.led_mode == 2;
+                        enabled: AuraPageData.mode_enabled[2];
+                        clicked => { AuraPageData.led_mode = 2; AuraPageData.cb_led_mode(2); }
+                    }
+                    EffectCard {
+                        name: "Rainbow";
+                        icon-char: "🌈";
+                        selected: AuraPageData.led_mode == 3; // Wave/Rainbow
+                        enabled: AuraPageData.mode_enabled[3];
+                        clicked => { AuraPageData.led_mode = 3; AuraPageData.cb_led_mode(3); }
+                    }
+                }
+
+                // Row 2
+                HorizontalLayout {
+                    spacing: RogTheme.spacing-md;
+
+                    EffectCard {
+                        name: "Starry Night";
+                        icon-char: "✨";
+                        selected: AuraPageData.led_mode == 4;
+                        enabled: AuraPageData.mode_enabled[4];
+                        clicked => { AuraPageData.led_mode = 4; AuraPageData.cb_led_mode(4); }
+                    }
+                    EffectCard {
+                        name: "Music";
+                        icon-char: "ılı";
+                        selected: false; // Not supported yet?
+                        enabled: false;
+                    }
+                    EffectCard {
+                        name: "Smart";
+                        icon-char: "⚙";
+                        selected: false;
+                        enabled: false;
+                    }
+                    EffectCard {
+                        name: "Dark (Off)";
+                        icon-char: "🚫";
+                        selected: AuraPageData.brightness == 0;
+                        clicked => { AuraPageData.brightness = 0; AuraPageData.cb_brightness(0); }
+                    }
+                }
+
+                Rectangle { vertical-stretch: 1; }
+
+                // Advanced Effects section (Placeholder)
+                Text {
+                    text: "■ Advanced Effects";
+                    color: RogTheme.text-tertiary; // Dimmed
+                    font-size: RogTheme.font-size-body;
+                    font-weight: 700;
+                }
+
+                GlassCard {
+                    height: 60px;
+                    GlassButton {
+                        text: "Aura Creator";
+                        accent-color: RogTheme.text-secondary;
+                        width: 100%;
+                    }
+                }
+            }
+
+            // RIGHT PANEL: Settings Panel
+            // Only visible if brightness > 0 (not Dark/Off)
+            if AuraPageData.brightness > 0 : GlassCard {
+                horizontal-stretch: 1;
+                // Background pattern similar to reference (diagonal lines) - simulated with solid color for now
+                background: RogTheme.bg-tertiary.with-alpha(0.5);
+
+                VerticalLayout {
+                    spacing: RogTheme.spacing-lg;
+                    padding: RogTheme.spacing-lg;
+
+                    // Header: Selected Mode Name
                     Text {
-                        text: "Aura RGB";
-                        font-size: RogTheme.font-size-h1;
+                        text: AuraPageData.led_mode == 0 ? "Static" :
+                              AuraPageData.led_mode == 1 ? "Breathing" :
+                              AuraPageData.led_mode == 2 ? "Color Cycle" :
+                              AuraPageData.led_mode == 3 ? "Rainbow" :
+                              "Effect Settings";
+                        font-size: RogTheme.font-size-h3;
                         font-weight: 700;
                         color: RogTheme.text-primary;
-                        vertical-alignment: center;
                     }
 
-                    // Brightness controls (inline)
-                    HorizontalLayout {
-                        spacing: RogTheme.spacing-xs;
-
-                        BrightnessBtn {
-                            label: "Off";
-                            icon: "🌑";
-                            selected: AuraPageData.brightness == 0;
-                            clicked => { AuraPageData.brightness = 0; AuraPageData.cb_brightness(0); }
-                        }
-                        BrightnessBtn {
-                            label: "Low";
-                            icon: "🌘";
-                            selected: AuraPageData.brightness == 1;
-                            clicked => { AuraPageData.brightness = 1; AuraPageData.cb_brightness(1); }
-                        }
-                        BrightnessBtn {
-                            label: "Med";
-                            icon: "🌗";
-                            selected: AuraPageData.brightness == 2;
-                            clicked => { AuraPageData.brightness = 2; AuraPageData.cb_brightness(2); }
-                        }
-                        BrightnessBtn {
-                            label: "High";
-                            icon: "🌕";
-                            selected: AuraPageData.brightness == 3;
-                            clicked => { AuraPageData.brightness = 3; AuraPageData.cb_brightness(3); }
-                        }
+                    // Pattern / Color Control
+                    // For Rainbow/Cycle: Show Gradient Bar
+                    if AuraPageData.led_mode == 2 || AuraPageData.led_mode == 3 : VerticalLayout {
+                        spacing: 8px;
+                        Text { text: "Pattern"; color: RogTheme.text-secondary; }
+                        GradientBar {}
                     }
-                }
 
-                // Keyboard Preview Section
-                GlassCard {
-                    title: "Keyboard Preview";
-                    accent-color: RogTheme.accent-cyan;
-                    height: 250px;
+                    // For Static/Breathing: Show Color Wheel
+                    if AuraPageData.led_mode == 0 || AuraPageData.led_mode == 1 || AuraPageData.led_mode == 12 : VerticalLayout {
+                        spacing: 8px;
+                        Text { text: "Color"; color: RogTheme.text-secondary; }
 
-                    VerticalLayout {
-                        spacing: RogTheme.spacing-sm;
-                        alignment: center;
-
-                        HorizontalLayout {
-                            alignment: center;
-                            KeyboardPreview {
-                                key_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                            }
-                        }
-                    }
-                }
-
-                // LED Effects Section - Compact 2 rows
-                GlassCard {
-                    title: "LED Effect";
-                    accent-color: RogTheme.accent-purple;
-
-                    VerticalLayout {
-                        spacing: RogTheme.spacing-sm;
-
-                        HorizontalLayout {
-                            alignment: end;
-
-                            // Speed controls (inline)
-                            if AuraPageData.led_mode > 0: HorizontalLayout {
-                                spacing: RogTheme.spacing-xs;
-
-                                Text {
-                                    text: "Speed:";
-                                    font-size: RogTheme.font-size-sm;
-                                    color: RogTheme.text-tertiary;
-                                    vertical-alignment: center;
-                                }
-
-                                SpeedBtn {
-                                    label: "Slow";
-                                    icon: "🐢";
-                                    selected: AuraPageData.led_speed == 0;
-                                    clicked => { AuraPageData.led_speed = 0; AuraPageData.cb_speed(0); }
-                                }
-                                SpeedBtn {
-                                    label: "Med";
-                                    icon: "⚡";
-                                    selected: AuraPageData.led_speed == 1;
-                                    clicked => { AuraPageData.led_speed = 1; AuraPageData.cb_speed(1); }
-                                }
-                                SpeedBtn {
-                                    label: "Fast";
-                                    icon: "🚀";
-                                    selected: AuraPageData.led_speed == 2;
-                                    clicked => { AuraPageData.led_speed = 2; AuraPageData.cb_speed(2); }
-                                }
-                            }
-                        }
-
-                        // Row 1: First 6 modes
-                        HorizontalLayout {
-                            spacing: RogTheme.spacing-sm;
-                            alignment: center;
-
-                            AnimatedModeCard {
-                                name: "Static";
-                                mode_id: 0;
-                                enabled: AuraPageData.mode_enabled[0];
-                                selected: AuraPageData.led_mode == 0;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 0; AuraPageData.cb_led_mode(0); }
-                            }
-                            AnimatedModeCard {
-                                name: "Breathe";
-                                mode_id: 1;
-                                enabled: AuraPageData.mode_enabled[1];
-                                selected: AuraPageData.led_mode == 1;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 1; AuraPageData.cb_led_mode(1); }
-                            }
-                            AnimatedModeCard {
-                                name: "Rainbow";
-                                mode_id: 2;
-                                enabled: AuraPageData.mode_enabled[2];
-                                selected: AuraPageData.led_mode == 2;
-                                preview_color: RogTheme.accent-cyan;
-                                clicked => { AuraPageData.led_mode = 2; AuraPageData.cb_led_mode(2); }
-                            }
-                            AnimatedModeCard {
-                                name: "Wave";
-                                mode_id: 3;
-                                enabled: AuraPageData.mode_enabled[3];
-                                selected: AuraPageData.led_mode == 3;
-                                preview_color: RogTheme.accent-cyan;
-                                clicked => { AuraPageData.led_mode = 3; AuraPageData.cb_led_mode(3); }
-                            }
-                            AnimatedModeCard {
-                                name: "Star";
-                                mode_id: 4;
-                                enabled: AuraPageData.mode_enabled[4];
-                                selected: AuraPageData.led_mode == 4;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 4; AuraPageData.cb_led_mode(4); }
-                            }
-                            AnimatedModeCard {
-                                name: "Rain";
-                                mode_id: 5;
-                                enabled: AuraPageData.mode_enabled[5];
-                                selected: AuraPageData.led_mode == 5;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 5; AuraPageData.cb_led_mode(5); }
-                            }
-                        }
-
-                        // Row 2: Remaining 6 modes
-                        HorizontalLayout {
-                            spacing: RogTheme.spacing-sm;
-                            alignment: center;
-
-                            AnimatedModeCard {
-                                name: "Highlight";
-                                mode_id: 6;
-                                enabled: AuraPageData.mode_enabled[6];
-                                selected: AuraPageData.led_mode == 6;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 6; AuraPageData.cb_led_mode(6); }
-                            }
-                            AnimatedModeCard {
-                                name: "Laser";
-                                mode_id: 7;
-                                enabled: AuraPageData.mode_enabled[7];
-                                selected: AuraPageData.led_mode == 7;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 7; AuraPageData.cb_led_mode(7); }
-                            }
-                            AnimatedModeCard {
-                                name: "Ripple";
-                                mode_id: 8;
-                                enabled: AuraPageData.mode_enabled[8];
-                                selected: AuraPageData.led_mode == 8;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 8; AuraPageData.cb_led_mode(8); }
-                            }
-                            AnimatedModeCard {
-                                name: "Pulse";
-                                mode_id: 10;
-                                enabled: AuraPageData.mode_enabled[10];
-                                selected: AuraPageData.led_mode == 10;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 10; AuraPageData.cb_led_mode(10); }
-                            }
-                            AnimatedModeCard {
-                                name: "Comet";
-                                mode_id: 11;
-                                enabled: AuraPageData.mode_enabled[11];
-                                selected: AuraPageData.led_mode == 11;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 11; AuraPageData.cb_led_mode(11); }
-                            }
-                            AnimatedModeCard {
-                                name: "Flash";
-                                mode_id: 12;
-                                enabled: AuraPageData.mode_enabled[12];
-                                selected: AuraPageData.led_mode == 12;
-                                preview_color: rgb(AuraPageData.color_r, AuraPageData.color_g, AuraPageData.color_b);
-                                clicked => { AuraPageData.led_mode = 12; AuraPageData.cb_led_mode(12); }
-                            }
-                        }
-                    }
-                }
-
-                // Color Section - Hide for Rainbow modes
-                if AuraPageData.led_mode != 2 && AuraPageData.led_mode != 3: GlassCard {
-                    title: "Color";
-                    accent-color: RogTheme.accent-red;
-
-                    VerticalLayout {
-                        spacing: RogTheme.spacing-md;
-
-                        HorizontalLayout {
-                            spacing: RogTheme.spacing-lg;
-                            alignment: center;
-
-                            // HSV Color Wheel
+                        Rectangle {
+                            height: 200px;
                             ColorWheel {
+                                width: 100%;
+                                height: 100%;
                                 red <=> AuraPageData.color_r;
                                 green <=> AuraPageData.color_g;
                                 blue <=> AuraPageData.color_b;
@@ -683,86 +339,40 @@ export component PageAura inherits Rectangle {
                                 saturation <=> AuraPageData.color_saturation;
                                 value <=> AuraPageData.color_value;
 
-                                color_changed(r, g, b) => {
-                                    AuraPageData.cb_color(r, g, b);
-                                }
-
-                                hue_changed(h) => {
-                                    AuraPageData.cb_hsv_color(h, AuraPageData.color_saturation, AuraPageData.color_value);
-                                }
-
-                                sv_changed(s, v) => {
-                                    AuraPageData.cb_hsv_color(AuraPageData.color_hue, s, v);
-                                }
+                                color_changed(r, g, b) => { AuraPageData.cb_color(r, g, b); }
+                                hue_changed(h) => { AuraPageData.cb_hsv_color(h, AuraPageData.color_saturation, AuraPageData.color_value); }
+                                sv_changed(s, v) => { AuraPageData.cb_hsv_color(AuraPageData.color_hue, s, v); }
                             }
                         }
+                    }
 
-                        // Quick color presets
-                        VerticalLayout {
-                            spacing: RogTheme.spacing-xs;
+                    Rectangle { vertical-stretch: 1; }
 
-                            Text {
-                                text: "Quick Colors";
-                                font-size: RogTheme.font-size-sm;
-                                color: RogTheme.text-tertiary;
-                            }
-
-                            HorizontalLayout {
-                                spacing: RogTheme.spacing-xs;
-                                alignment: start;
-
-                                QuickColor {
-                                    swatch_color: #FF0055;
-                                    clicked => { AuraPageData.color_r = 255; AuraPageData.color_g = 0; AuraPageData.color_b = 85; AuraPageData.cb_color(255, 0, 85); }
-                                }
-                                QuickColor {
-                                    swatch_color: #00D9FF;
-                                    clicked => { AuraPageData.color_r = 0; AuraPageData.color_g = 217; AuraPageData.color_b = 255; AuraPageData.cb_color(0, 217, 255); }
-                                }
-                                QuickColor {
-                                    swatch_color: #B366FF;
-                                    clicked => { AuraPageData.color_r = 179; AuraPageData.color_g = 102; AuraPageData.color_b = 255; AuraPageData.cb_color(179, 102, 255); }
-                                }
-                                QuickColor {
-                                    swatch_color: #00FF66;
-                                    clicked => { AuraPageData.color_r = 0; AuraPageData.color_g = 255; AuraPageData.color_b = 102; AuraPageData.cb_color(0, 255, 102); }
-                                }
-                                QuickColor {
-                                    swatch_color: #FFAA00;
-                                    clicked => { AuraPageData.color_r = 255; AuraPageData.color_g = 170; AuraPageData.color_b = 0; AuraPageData.cb_color(255, 170, 0); }
-                                }
-                                QuickColor {
-                                    swatch_color: #FFFFFF;
-                                    clicked => { AuraPageData.color_r = 255; AuraPageData.color_g = 255; AuraPageData.color_b = 255; AuraPageData.cb_color(255, 255, 255); }
-                                }
-                                QuickColor {
-                                    swatch_color: #4444FF;
-                                    clicked => { AuraPageData.color_r = 68; AuraPageData.color_g = 68; AuraPageData.color_b = 255; AuraPageData.cb_color(68, 68, 255); }
-                                }
-                                QuickColor {
-                                    swatch_color: #FFFF00;
-                                    clicked => { AuraPageData.color_r = 255; AuraPageData.color_g = 255; AuraPageData.color_b = 0; AuraPageData.cb_color(255, 255, 0); }
-                                }
-                                QuickColor {
-                                    swatch_color: #FF66FF;
-                                    clicked => { AuraPageData.color_r = 255; AuraPageData.color_g = 102; AuraPageData.color_b = 255; AuraPageData.cb_color(255, 102, 255); }
-                                }
-                                QuickColor {
-                                    swatch_color: #00FFAA;
-                                    clicked => { AuraPageData.color_r = 0; AuraPageData.color_g = 255; AuraPageData.color_b = 170; AuraPageData.cb_color(0, 255, 170); }
-                                }
-                            }
+                    // LED Brightness Slider
+                    TickSlider {
+                        label: "LED Brightness";
+                        minimum: 0;
+                        maximum: 3;
+                        ticks: 4; // 0, 1, 2, 3
+                        show-labels: true;
+                        value: AuraPageData.brightness;
+                        changed(val) => {
+                            AuraPageData.brightness = round(val);
+                            AuraPageData.cb_brightness(round(val));
                         }
+                    }
 
-                        // Saved presets
-                        ColorPresetsRow {
-                            presets <=> AuraPageData.saved_presets;
-                            preset_filled <=> AuraPageData.preset_filled;
-                            selected_preset <=> AuraPageData.selected_preset;
-
-                            preset_clicked(idx) => { AuraPageData.cb_load_preset(idx); }
-                            save_preset(idx) => { AuraPageData.cb_save_preset(idx); }
-                            delete_preset(idx) => { AuraPageData.cb_delete_preset(idx); }
+                    // Speed Slider (Hidden for Static)
+                    if AuraPageData.led_mode != 0 : TickSlider {
+                        label: "Speed";
+                        minimum: 0;
+                        maximum: 2;
+                        ticks: 3; // Slow, Normal, Fast
+                        show-labels: true;
+                        value: AuraPageData.led_speed;
+                        changed(val) => {
+                            AuraPageData.led_speed = round(val);
+                            AuraPageData.cb_speed(round(val));
                         }
                     }
                 }

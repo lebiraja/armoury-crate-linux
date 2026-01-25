@@ -6,7 +6,7 @@ import { RogTheme } from "../theme.slint";
 // Individual navigation item
 export component SidebarItem inherits Rectangle {
     in property <string> label;
-    in property <string> icon;
+    // Icon property removed as requested
     in property <bool> is-selected: false;
     in property <bool> is-available: true;
 
@@ -42,22 +42,9 @@ export component SidebarItem inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: RogTheme.spacing-lg;
+        padding-left: RogTheme.spacing-xl; // Increased padding since icon is gone
         spacing: RogTheme.spacing-md;
         alignment: start;
-
-        // Icon placeholder (text based for now)
-        Text {
-            text: icon;
-            color: is-selected ? RogTheme.accent-red :
-                   is-available ? RogTheme.text-secondary : RogTheme.text-disabled;
-            font-size: 18px;
-            vertical-alignment: center;
-            width: 24px;
-            horizontal-alignment: center;
-
-            animate color { duration: RogTheme.anim-fast; }
-        }
 
         Text {
             text: label;
@@ -155,22 +142,19 @@ export component SidebarGaming inherits Rectangle {
 
             SidebarItem {
                 label: "Dashboard";
-                icon: "📊";
                 is-selected: current-item == 0;
                 clicked => { root.item-clicked(0); }
             }
 
             SidebarItem {
                 label: "System Control";
-                icon: "⚙️";
                 is-selected: current-item == 1;
                 clicked => { root.item-clicked(1); }
             }
 
             SidebarItem {
                 label: "Fan Curves";
-                icon: "💨";
-                is-selected: current-item == 2; // Was 3 previously, re-indexing
+                is-selected: current-item == 2;
                 clicked => { root.item-clicked(2); }
             }
         }
@@ -188,14 +172,12 @@ export component SidebarGaming inherits Rectangle {
 
             SidebarItem {
                 label: "Aura RGB";
-                icon: "🌈";
-                is-selected: current-item == 3; // Was 2 previously
+                is-selected: current-item == 3;
                 clicked => { root.item-clicked(3); }
             }
 
             SidebarItem {
                 label: "Scenario Profiles";
-                icon: "🎮";
                 is-selected: current-item == 4;
                 is-available: true; // Placeholder but clickable
                 clicked => { root.item-clicked(4); }
@@ -203,7 +185,6 @@ export component SidebarGaming inherits Rectangle {
 
             SidebarItem {
                 label: "AniMe Matrix";
-                icon: "👾";
                 is-selected: current-item == 5;
                 is-available: true; // Placeholder
                 clicked => { root.item-clicked(5); }
@@ -222,14 +203,12 @@ export component SidebarGaming inherits Rectangle {
 
             SidebarItem {
                 label: "Settings";
-                icon: "🔧";
                 is-selected: current-item == 6;
                 clicked => { root.item-clicked(6); }
             }
 
             SidebarItem {
                 label: "About";
-                icon: "ℹ️";
                 is-selected: current-item == 7;
                 clicked => { root.item-clicked(7); }
             }
@@ -241,7 +220,6 @@ export component SidebarGaming inherits Rectangle {
         // Quit Button
         SidebarItem {
             label: "Quit App";
-            icon: "🚪";
             is-selected: false;
             clicked => { root.quit-clicked(); }
         }
