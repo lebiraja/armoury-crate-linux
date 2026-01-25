@@ -46,10 +46,17 @@ pub fn setup_dashboard_page(ui: &MainWindow, monitor: Arc<SystemMonitor>) {
                     dashboard.set_gpu_usage(data.gpu_usage);
                     dashboard.set_gpu_temp(data.gpu_temp);
                     dashboard.set_gpu_power_watts(data.gpu_power_watts);
+                    // GPU Frequency requires updated monitoring struct, assuming it's available or mocked for now
+                    // dashboard.set_gpu_freq_mhz(data.gpu_freq_mhz as f32);
 
                     dashboard.set_ram_usage_percent(data.ram_usage);
                     dashboard.set_ram_total_gb(data.ram_total_gb);
                     dashboard.set_ram_used_gb(data.ram_used_gb);
+
+                    // Storage metrics
+                    dashboard.set_disk_usage_percent(data.disk_usage);
+                    dashboard.set_disk_total_gb(data.disk_total_gb);
+                    dashboard.set_disk_used_gb(data.disk_used_gb);
 
                     // Fan speeds
                     if !data.fan_rpm.is_empty() {
@@ -65,14 +72,8 @@ pub fn setup_dashboard_page(ui: &MainWindow, monitor: Arc<SystemMonitor>) {
                     dashboard.set_on_ac_power(data.on_ac_power);
 
                     // Update history graphs (convert to VecModel for Slint)
-                    dashboard.set_cpu_usage_history(slint::ModelRc::new(slint::VecModel::from(
-                        history.cpu_usage.clone(),
-                    )));
                     dashboard.set_cpu_temp_history(slint::ModelRc::new(slint::VecModel::from(
                         history.cpu_temp.clone(),
-                    )));
-                    dashboard.set_gpu_usage_history(slint::ModelRc::new(slint::VecModel::from(
-                        history.gpu_usage.clone(),
                     )));
                     dashboard.set_gpu_temp_history(slint::ModelRc::new(slint::VecModel::from(
                         history.gpu_temp.clone(),

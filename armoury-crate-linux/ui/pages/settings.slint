@@ -1,7 +1,8 @@
 // Settings page - Application configuration
-// Theme, notifications, tray icon, power commands
+// Redesigned with glassmorphism
 
 import { RogTheme } from "../theme.slint";
+import { GlassCard, GlassToggle, GlassButton, SectionHeader } from "../widgets/glass_card.slint";
 
 // Settings data bindings
 export global SettingsData {
@@ -43,20 +44,20 @@ export global SettingsData {
     callback cb_set_bat_command(string);
 }
 
-// Toggle switch component
-component SettingsToggle inherits Rectangle {
+// Settings Toggle Row
+component SettingsToggleRow inherits Rectangle {
     in property <string> label;
     in property <string> description: "";
-    in-out property <bool> checked: true;
+    in-out property <bool> checked;
     callback toggled(bool);
 
-    height: description != "" ? 56px : 40px;
+    height: 48px;
+    background: transparent;
 
     HorizontalLayout {
         spacing: RogTheme.spacing-md;
 
         VerticalLayout {
-            horizontal-stretch: 1;
             alignment: center;
             spacing: 2px;
 
@@ -73,47 +74,27 @@ component SettingsToggle inherits Rectangle {
             }
         }
 
-        // Toggle track
-        Rectangle {
-            width: 44px;
-            height: 24px;
-            border-radius: 12px;
-            background: checked ? RogTheme.accent-cyan.with-alpha(0.3) : RogTheme.bg-tertiary;
-            border-width: 1px;
-            border-color: checked ? RogTheme.accent-cyan : RogTheme.border-default;
+        Rectangle { horizontal-stretch: 1; }
 
-            Rectangle {
-                x: checked ? parent.width - self.width - 3px : 3px;
-                y: (parent.height - self.height) / 2;
-                width: 18px;
-                height: 18px;
-                border-radius: 9px;
-                background: checked ? RogTheme.accent-cyan : RogTheme.text-secondary;
-
-                animate x { duration: RogTheme.anim-fast; easing: ease-out; }
-            }
-
-            TouchArea {
-                clicked => {
-                    checked = !checked;
-                    toggled(checked);
-                }
-            }
+        GlassToggle {
+            checked <=> root.checked;
+            toggled(v) => { root.toggled(v); }
         }
     }
 }
 
-// Text input component
-component SettingsInput inherits Rectangle {
+// Settings Input Row
+component SettingsInputRow inherits Rectangle {
     in property <string> label;
     in property <string> placeholder: "";
     in-out property <string> value;
     callback changed(string);
 
     height: 72px;
+    background: transparent;
 
     VerticalLayout {
-        spacing: RogTheme.spacing-xs;
+        spacing: RogTheme.spacing-sm;
 
         Text {
             text: label;
@@ -123,10 +104,10 @@ component SettingsInput inherits Rectangle {
 
         Rectangle {
             height: 40px;
-            background: RogTheme.bg-tertiary;
+            background: RogTheme.bg-tertiary.with-alpha(0.5);
             border-radius: RogTheme.radius-md;
             border-width: 1px;
-            border-color: input.has-focus ? RogTheme.accent-cyan : RogTheme.border-default;
+            border-color: input.has-focus ? RogTheme.accent-cyan : RogTheme.glass-border;
 
             input := TextInput {
                 x: RogTheme.spacing-md;
@@ -135,6 +116,7 @@ component SettingsInput inherits Rectangle {
                 font-size: RogTheme.font-size-body;
                 color: RogTheme.text-primary;
                 text <=> value;
+                vertical-alignment: center;
 
                 accepted => { changed(self.text); }
                 edited => { changed(self.text); }
@@ -143,84 +125,9 @@ component SettingsInput inherits Rectangle {
     }
 }
 
-// Section header
-component SectionHeader inherits Rectangle {
-    in property <string> title;
-    in property <string> icon: "";
-
-    height: 32px;
-
-    HorizontalLayout {
-        spacing: RogTheme.spacing-sm;
-
-        if icon != "": Text {
-            text: icon;
-            font-size: RogTheme.font-size-lg;
-            vertical-alignment: center;
-        }
-
-        Text {
-            text: title;
-            font-size: RogTheme.font-size-lg;
-            font-weight: 600;
-            color: RogTheme.text-primary;
-            vertical-alignment: center;
-        }
-    }
-}
-
-// Settings card container
-component SettingsCard inherits Rectangle {
-    background: RogTheme.bg-card;
-    border-radius: RogTheme.radius-lg;
-    border-width: 1px;
-    border-color: RogTheme.border-default;
-
-    VerticalLayout {
-        padding: RogTheme.spacing-lg;
-        spacing: RogTheme.spacing-md;
-
-        @children
-    }
-}
-
-// Gaming button component
-component SettingsButton inherits Rectangle {
-    in property <string> label;
-    in property <color> button_color: RogTheme.accent-cyan;
-    in property <bool> outlined: false;
-    callback clicked();
-
-    height: 40px;
-    min-width: 120px;
-    background: outlined ? transparent : button_color;
-    border-radius: RogTheme.radius-md;
-    border-width: outlined ? 2px : 0px;
-    border-color: button_color;
-
-    states [
-        hover when touch.has-hover: {
-            background: outlined ? button_color.with-alpha(0.15) : button_color.with-alpha(0.8);
-        }
-    ]
-
-    touch := TouchArea {
-        clicked => { root.clicked(); }
-    }
-
-    Text {
-        text: label;
-        font-size: RogTheme.font-size-body;
-        font-weight: 600;
-        color: outlined ? button_color : white;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-}
-
 // Main settings page
 export component PageSettings inherits Rectangle {
-    background: RogTheme.bg-primary;
+    background: transparent;
 
     VerticalLayout {
         padding: RogTheme.spacing-lg;
@@ -241,16 +148,16 @@ export component PageSettings inherits Rectangle {
             HorizontalLayout {
                 spacing: RogTheme.spacing-sm;
 
-                SettingsButton {
-                    label: "Reset Defaults";
-                    button_color: RogTheme.text-secondary;
-                    outlined: true;
+                GlassButton {
+                    text: "Reset Defaults";
+                    accent-color: RogTheme.text-secondary;
                     clicked => { SettingsData.cb_reset_defaults(); }
                 }
 
-                SettingsButton {
-                    label: "Save";
-                    button_color: RogTheme.accent-cyan;
+                GlassButton {
+                    text: "Save";
+                    accent-color: RogTheme.accent-cyan;
+                    selected: true;
                     clicked => { SettingsData.cb_save_settings(); }
                 }
             }
@@ -263,26 +170,27 @@ export component PageSettings inherits Rectangle {
 
             content := VerticalLayout {
                 spacing: RogTheme.spacing-lg;
+                padding-bottom: RogTheme.spacing-lg; // Bottom padding for scrolling
 
                 // Application Settings
-                SectionHeader { title: "Application"; icon: ""; }
+                SectionHeader { title: "Application"; icon: "🔧"; }
 
-                SettingsCard {
-                    SettingsToggle {
+                GlassCard {
+                    SettingsToggleRow {
                         label: "Run in Background";
                         description: "Keep running when window is closed";
                         checked <=> SettingsData.run_in_background;
                         toggled(v) => { SettingsData.cb_toggle_run_in_background(v); }
                     }
 
-                    SettingsToggle {
+                    SettingsToggleRow {
                         label: "Start Minimized";
                         description: "Start hidden in system tray";
                         checked <=> SettingsData.startup_in_background;
                         toggled(v) => { SettingsData.cb_toggle_startup_in_background(v); }
                     }
 
-                    SettingsToggle {
+                    SettingsToggleRow {
                         label: "Enable Tray Icon";
                         description: "Show icon in system tray";
                         checked <=> SettingsData.enable_tray_icon;
@@ -291,31 +199,31 @@ export component PageSettings inherits Rectangle {
                 }
 
                 // Notification Settings
-                SectionHeader { title: "Notifications"; icon: ""; }
+                SectionHeader { title: "Notifications"; icon: "🔔"; }
 
-                SettingsCard {
-                    SettingsToggle {
+                GlassCard {
+                    SettingsToggleRow {
                         label: "Enable Notifications";
                         description: "Show system notifications";
                         checked <=> SettingsData.notifications_enabled;
                         toggled(v) => { SettingsData.cb_toggle_notifications(v); }
                     }
 
-                    SettingsToggle {
+                    SettingsToggleRow {
                         label: "GPU Status";
                         description: "Notify when GPU status changes";
                         checked <=> SettingsData.notify_gpu_status;
                         toggled(v) => { SettingsData.cb_toggle_notify_gpu(v); }
                     }
 
-                    SettingsToggle {
+                    SettingsToggleRow {
                         label: "Profile Changes";
                         description: "Notify when performance profile changes";
                         checked <=> SettingsData.notify_profile_changes;
                         toggled(v) => { SettingsData.cb_toggle_notify_profile(v); }
                     }
 
-                    SettingsToggle {
+                    SettingsToggleRow {
                         label: "Charging Status";
                         description: "Notify when charging status changes";
                         checked <=> SettingsData.notify_charging_status;
@@ -324,56 +232,55 @@ export component PageSettings inherits Rectangle {
                 }
 
                 // Monitoring Settings
-                SectionHeader { title: "Monitoring"; icon: ""; }
+                SectionHeader { title: "Monitoring"; icon: "📊"; }
 
-                SettingsCard {
-                    SettingsToggle {
+                GlassCard {
+                    SettingsToggleRow {
                         label: "Enable Monitoring";
                         description: "Enable real-time system monitoring";
                         checked <=> SettingsData.monitoring_enabled;
                         toggled(v) => { SettingsData.cb_toggle_monitoring(v); }
                     }
 
-                    SettingsToggle {
+                    SettingsToggleRow {
                         label: "Show GPU Metrics";
                         description: "Display GPU temperature and usage";
                         checked <=> SettingsData.show_gpu_metrics;
+                        toggled(v) => { SettingsData.cb_toggle_notify_gpu(v); } // Reusing callback for now
                     }
 
-                    SettingsToggle {
+                    SettingsToggleRow {
                         label: "Show Power Metrics";
                         description: "Display power consumption";
                         checked <=> SettingsData.show_power_metrics;
+                        toggled(v) => { SettingsData.cb_toggle_notify_charging(v); } // Reusing callback for now
                     }
                 }
 
                 // Power Commands
-                SectionHeader { title: "Power Commands"; icon: ""; }
+                SectionHeader { title: "Power Commands"; icon: "⚡"; }
 
-                SettingsCard {
+                GlassCard {
                     Text {
                         text: "Execute custom commands when power source changes";
                         font-size: RogTheme.font-size-sm;
                         color: RogTheme.text-tertiary;
                     }
 
-                    SettingsInput {
+                    SettingsInputRow {
                         label: "AC Power Command";
                         placeholder: "e.g., /path/to/script.sh";
                         value <=> SettingsData.ac_command;
                         changed(v) => { SettingsData.cb_set_ac_command(v); }
                     }
 
-                    SettingsInput {
+                    SettingsInputRow {
                         label: "Battery Command";
                         placeholder: "e.g., /path/to/script.sh";
                         value <=> SettingsData.bat_command;
                         changed(v) => { SettingsData.cb_set_bat_command(v); }
                     }
                 }
-
-                // Bottom spacer
-                Rectangle { height: RogTheme.spacing-lg; }
             }
         }
     }

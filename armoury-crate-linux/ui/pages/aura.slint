@@ -1,9 +1,10 @@
 // Aura RGB control page - Enhanced UI with color wheel, keyboard preview, and animated modes
-// Gaming-styled controls for ASUS Aura keyboard lighting
+// Redesigned with glassmorphism styling
 
 import { RogTheme } from "../theme.slint";
 import { ColorWheel, ColorPresetsRow } from "../widgets/color_wheel.slint";
 import { KeyboardPreview } from "../widgets/keyboard_preview.slint";
+import { GlassCard, GlassButton, SectionHeader } from "../widgets/glass_card.slint";
 
 // Aura page data bindings
 export global AuraPageData {
@@ -66,27 +67,27 @@ export global AuraPageData {
     in-out property <string> error_message: "";
 }
 
-// Compact brightness button
+// Compact brightness button (Glass style)
 component BrightnessBtn inherits Rectangle {
     in property <string> label;
     in property <string> icon;
     in property <bool> selected: false;
     callback clicked();
 
-    width: 56px;
-    height: 48px;
-    background: selected ? RogTheme.accent-cyan.with-alpha(0.2) : RogTheme.bg-card;
+    width: 64px;
+    height: 56px;
+    background: selected ? RogTheme.accent-cyan.with-alpha(0.2) : RogTheme.glass-bg;
     border-radius: RogTheme.radius-md;
     border-width: selected ? 2px : 1px;
-    border-color: selected ? RogTheme.accent-cyan : RogTheme.border-default;
+    border-color: selected ? RogTheme.accent-cyan : RogTheme.glass-border;
 
     drop-shadow-color: selected ? RogTheme.accent-cyan.with-alpha(0.4) : #00000000;
     drop-shadow-blur: selected ? 10px : 0px;
 
     states [
         hover when touch.has-hover && !selected: {
-            background: RogTheme.bg-hover;
-            border-color: RogTheme.accent-cyan.with-alpha(0.5);
+            background: RogTheme.glass-bg-light;
+            border-color: RogTheme.glass-border-active;
         }
     ]
 
@@ -100,7 +101,7 @@ component BrightnessBtn inherits Rectangle {
 
         Text {
             text: icon;
-            font-size: 18px;
+            font-size: 20px;
             horizontal-alignment: center;
         }
 
@@ -114,23 +115,23 @@ component BrightnessBtn inherits Rectangle {
     }
 }
 
-// Speed button component
+// Speed button component (Glass style)
 component SpeedBtn inherits Rectangle {
     in property <string> label;
     in property <string> icon;
     in property <bool> selected: false;
     callback clicked();
 
-    width: 52px;
-    height: 40px;
-    background: selected ? RogTheme.accent-orange.with-alpha(0.2) : RogTheme.bg-card;
+    width: 60px;
+    height: 36px;
+    background: selected ? RogTheme.accent-orange.with-alpha(0.2) : RogTheme.glass-bg;
     border-radius: RogTheme.radius-sm;
     border-width: selected ? 2px : 1px;
-    border-color: selected ? RogTheme.accent-orange : RogTheme.border-default;
+    border-color: selected ? RogTheme.accent-orange : RogTheme.glass-border;
 
     states [
         hover when touch.has-hover && !selected: {
-            background: RogTheme.bg-hover;
+            background: RogTheme.glass-bg-light;
         }
     ]
 
@@ -158,7 +159,7 @@ component SpeedBtn inherits Rectangle {
     }
 }
 
-// Animated mode card (compact version)
+// Animated mode card (Glass style)
 component AnimatedModeCard inherits Rectangle {
     in property <string> name;
     in property <int> mode_id: 0;
@@ -172,12 +173,12 @@ component AnimatedModeCard inherits Rectangle {
 
     callback clicked();
 
-    width: 80px;
-    height: 65px;
-    background: selected ? RogTheme.accent-purple.with-alpha(0.2) : (enabled ? RogTheme.bg-card : RogTheme.bg-tertiary);
+    width: 90px;
+    height: 72px;
+    background: selected ? RogTheme.accent-purple.with-alpha(0.2) : (enabled ? RogTheme.glass-bg : RogTheme.glass-bg.with-alpha(0.3));
     border-radius: RogTheme.radius-md;
     border-width: selected ? 2px : 1px;
-    border-color: selected ? RogTheme.accent-purple : (enabled ? RogTheme.border-default : RogTheme.border-default.with-alpha(0.3));
+    border-color: selected ? RogTheme.accent-purple : (enabled ? RogTheme.glass-border : RogTheme.glass-border.with-alpha(0.3));
     opacity: enabled ? 1.0 : 0.4;
 
     drop-shadow-color: selected ? RogTheme.accent-purple.with-alpha(0.5) : #00000000;
@@ -185,8 +186,8 @@ component AnimatedModeCard inherits Rectangle {
 
     states [
         hover when touch.has-hover && !selected && enabled: {
-            background: RogTheme.bg-hover;
-            border-color: RogTheme.accent-purple.with-alpha(0.5);
+            background: RogTheme.glass-bg-light;
+            border-color: RogTheme.glass-border-active;
         }
     ]
 
@@ -200,15 +201,16 @@ component AnimatedModeCard inherits Rectangle {
 
     VerticalLayout {
         alignment: center;
-        spacing: 4px;
+        spacing: 6px;
         padding: 6px;
 
         // Animated preview area
         Rectangle {
-            width: 56px;
-            height: 22px;
+            width: 64px;
+            height: 28px;
             border-radius: 4px;
             clip: true;
+            background: RogTheme.bg-tertiary;
 
             // Base color layer
             Rectangle {
@@ -340,7 +342,7 @@ component AnimatedModeCard inherits Rectangle {
         // Mode name
         Text {
             text: name;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: selected ? 600 : 400;
             color: selected ? RogTheme.accent-purple : RogTheme.text-primary;
             horizontal-alignment: center;
@@ -354,16 +356,17 @@ component QuickColor inherits Rectangle {
     in property <color> swatch_color;
     callback clicked();
 
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
+    width: 36px;
+    height: 36px;
+    border-radius: RogTheme.radius-sm;
     background: swatch_color;
-    border-width: 2px;
-    border-color: RogTheme.border-default;
+    border-width: 1px;
+    border-color: RogTheme.glass-border;
 
     states [
         hover when touch.has-hover: {
             border-color: white;
+            border-width: 2px;
             drop-shadow-blur: 8px;
         }
     ]
@@ -371,14 +374,14 @@ component QuickColor inherits Rectangle {
     drop-shadow-color: swatch_color.with-alpha(0.4);
     drop-shadow-blur: 0px;
 
-    animate border-color, drop-shadow-blur { duration: RogTheme.anim-fast; }
+    animate border-color, border-width, drop-shadow-blur { duration: RogTheme.anim-fast; }
 
     touch := TouchArea { clicked => { root.clicked(); } }
 }
 
 // Main Aura page
 export component PageAura inherits Rectangle {
-    background: #00000000;
+    background: transparent;
 
     // Not available state
     if !AuraPageData.aura_available: Rectangle {
@@ -438,8 +441,8 @@ export component PageAura inherits Rectangle {
             viewport-height: content.preferred-height;
 
             content := VerticalLayout {
-                padding: RogTheme.spacing-md;
-                spacing: RogTheme.spacing-md;
+                padding: RogTheme.spacing-lg;
+                spacing: RogTheme.spacing-lg;
 
                 // Header with title and brightness
                 HorizontalLayout {
@@ -486,22 +489,14 @@ export component PageAura inherits Rectangle {
                 }
 
                 // Keyboard Preview Section
-                Rectangle {
-                    background: RogTheme.bg-secondary;
-                    border-radius: RogTheme.radius-lg;
-                    border-width: 1px;
-                    border-color: RogTheme.border-default;
-                    height: 230px;
+                GlassCard {
+                    title: "Keyboard Preview";
+                    accent-color: RogTheme.accent-cyan;
+                    height: 250px;
 
                     VerticalLayout {
-                        padding: RogTheme.spacing-md;
                         spacing: RogTheme.spacing-sm;
-
-                        Text {
-                            text: "Keyboard Preview";
-                            font-size: RogTheme.font-size-sm;
-                            color: RogTheme.text-tertiary;
-                        }
+                        alignment: center;
 
                         HorizontalLayout {
                             alignment: center;
@@ -513,26 +508,15 @@ export component PageAura inherits Rectangle {
                 }
 
                 // LED Effects Section - Compact 2 rows
-                Rectangle {
-                    background: RogTheme.bg-secondary;
-                    border-radius: RogTheme.radius-lg;
-                    border-width: 1px;
-                    border-color: RogTheme.border-default;
+                GlassCard {
+                    title: "LED Effect";
+                    accent-color: RogTheme.accent-purple;
 
                     VerticalLayout {
-                        padding: RogTheme.spacing-md;
                         spacing: RogTheme.spacing-sm;
 
                         HorizontalLayout {
-                            Text {
-                                text: "LED Effect";
-                                font-size: RogTheme.font-size-lg;
-                                font-weight: 600;
-                                color: RogTheme.text-primary;
-                                vertical-alignment: center;
-                            }
-
-                            Rectangle { horizontal-stretch: 1; }
+                            alignment: end;
 
                             // Speed controls (inline)
                             if AuraPageData.led_mode > 0: HorizontalLayout {
@@ -568,7 +552,7 @@ export component PageAura inherits Rectangle {
 
                         // Row 1: First 6 modes
                         HorizontalLayout {
-                            spacing: RogTheme.spacing-xs;
+                            spacing: RogTheme.spacing-sm;
                             alignment: center;
 
                             AnimatedModeCard {
@@ -623,7 +607,7 @@ export component PageAura inherits Rectangle {
 
                         // Row 2: Remaining 6 modes
                         HorizontalLayout {
-                            spacing: RogTheme.spacing-xs;
+                            spacing: RogTheme.spacing-sm;
                             alignment: center;
 
                             AnimatedModeCard {
@@ -679,22 +663,12 @@ export component PageAura inherits Rectangle {
                 }
 
                 // Color Section - Hide for Rainbow modes
-                if AuraPageData.led_mode != 2 && AuraPageData.led_mode != 3: Rectangle {
-                    background: RogTheme.bg-secondary;
-                    border-radius: RogTheme.radius-lg;
-                    border-width: 1px;
-                    border-color: RogTheme.border-default;
+                if AuraPageData.led_mode != 2 && AuraPageData.led_mode != 3: GlassCard {
+                    title: "Color";
+                    accent-color: RogTheme.accent-red;
 
                     VerticalLayout {
-                        padding: RogTheme.spacing-md;
                         spacing: RogTheme.spacing-md;
-
-                        Text {
-                            text: "Color";
-                            font-size: RogTheme.font-size-lg;
-                            font-weight: 600;
-                            color: RogTheme.text-primary;
-                        }
 
                         HorizontalLayout {
                             spacing: RogTheme.spacing-lg;

@@ -1,44 +1,44 @@
 // Gaming-styled sidebar navigation for Armoury Crate Linux
+// Redesigned with glassmorphism and grouped navigation
 
 import { RogTheme } from "../theme.slint";
 
+// Individual navigation item
 export component SidebarItem inherits Rectangle {
     in property <string> label;
+    in property <string> icon;
     in property <bool> is-selected: false;
     in property <bool> is-available: true;
 
     callback clicked();
 
-    height: 48px;
-    border-radius: RogTheme.radius-md;
-    background: is-selected ? RogTheme.accent-red.with-alpha(0.15) :
-                touch.has-hover && is-available ? RogTheme.bg-hover : transparent;
+    height: 44px; // Slightly more compact
+    background: transparent;
 
-    animate background { duration: RogTheme.anim-fast; }
+    // Selection background/glass effect
+    Rectangle {
+        x: 4px;
+        width: parent.width - 8px;
+        height: 100%;
+        border-radius: RogTheme.radius-md;
+        background: is-selected ? RogTheme.accent-red.with-alpha(0.15) :
+                    touch.has-hover && is-available ? RogTheme.bg-hover : transparent;
+        border-width: is-selected ? 1px : 0px;
+        border-color: RogTheme.accent-red.with-alpha(0.3);
+
+        animate background, border-color { duration: RogTheme.anim-fast; }
+    }
 
     // Left accent bar for selected item
     Rectangle {
         x: 0;
-        width: is-selected ? 4px : 0px;
-        height: 100%;
+        y: 8px;
+        width: is-selected ? 3px : 0px;
+        height: parent.height - 16px;
         background: RogTheme.accent-red;
         border-radius: 2px;
 
         animate width { duration: RogTheme.anim-fast; }
-    }
-
-    // Selection border
-    Rectangle {
-        x: 2px;
-        y: 2px;
-        width: parent.width - 4px;
-        height: parent.height - 4px;
-        border-radius: RogTheme.radius-md;
-        border-width: is-selected ? 1px : 0px;
-        border-color: RogTheme.accent-red.with-alpha(0.5);
-        background: transparent;
-
-        animate border-width { duration: RogTheme.anim-fast; }
     }
 
     HorizontalLayout {
@@ -46,11 +46,25 @@ export component SidebarItem inherits Rectangle {
         spacing: RogTheme.spacing-md;
         alignment: start;
 
+        // Icon placeholder (text based for now)
+        Text {
+            text: icon;
+            color: is-selected ? RogTheme.accent-red :
+                   is-available ? RogTheme.text-secondary : RogTheme.text-disabled;
+            font-size: 18px;
+            vertical-alignment: center;
+            width: 24px;
+            horizontal-alignment: center;
+
+            animate color { duration: RogTheme.anim-fast; }
+        }
+
         Text {
             text: label;
-            color: is-selected ? RogTheme.accent-red :
-                   is-available ? RogTheme.text-primary : RogTheme.text-disabled;
+            color: is-selected ? RogTheme.text-primary :
+                   is-available ? RogTheme.text-secondary : RogTheme.text-disabled;
             font-size: RogTheme.font-size-body;
+            font-weight: is-selected ? RogTheme.font-weight-semibold : RogTheme.font-weight-normal;
             vertical-alignment: center;
 
             animate color { duration: RogTheme.anim-fast; }
@@ -66,22 +80,33 @@ export component SidebarItem inherits Rectangle {
     }
 }
 
+// Group header text
+component SidebarGroupHeader inherits Text {
+    font-size: RogTheme.font-size-xs;
+    font-weight: RogTheme.font-weight-bold;
+    color: RogTheme.text-tertiary;
+    letter-spacing: 1px;
+    vertical-alignment: center;
+}
+
+// Main Sidebar Component
 export component SidebarGaming inherits Rectangle {
-    in property <[string]> items: [];
-    in property <[bool]> available: [];
+    // Current active page index
     in-out property <int> current-item: 0;
 
+    // Callbacks
     callback item-clicked(int);
+    callback quit-clicked();
 
     width: RogTheme.sidebar-width;
-    background: RogTheme.bg-secondary;
+    background: RogTheme.bg-secondary.with-alpha(0.8); // Semi-transparent base
 
-    // Subtle right border
+    // Glass border on right
     Rectangle {
         x: parent.width - 1px;
         width: 1px;
         height: 100%;
-        background: RogTheme.border-default;
+        background: RogTheme.glass-border;
     }
 
     VerticalLayout {
@@ -95,68 +120,130 @@ export component SidebarGaming inherits Rectangle {
 
             VerticalLayout {
                 alignment: center;
+                spacing: 2px;
 
                 Text {
                     text: "ARMOURY";
                     font-size: RogTheme.font-size-h3;
-                    font-weight: 700;
+                    font-weight: 900;
                     color: RogTheme.text-primary;
                     horizontal-alignment: center;
                 }
 
                 Text {
                     text: "CRATE LINUX";
-                    font-size: RogTheme.font-size-sm;
-                    font-weight: 500;
+                    font-size: RogTheme.font-size-xs;
+                    font-weight: 700;
                     color: RogTheme.accent-red;
                     horizontal-alignment: center;
-                    letter-spacing: 2px;
+                    letter-spacing: 3px;
                 }
             }
         }
 
-        // Separator
-        Rectangle {
-            height: 1px;
-            background: RogTheme.border-default;
+        // Section: System
+        VerticalLayout {
+            spacing: 2px;
+            padding-top: RogTheme.spacing-md;
+            padding-bottom: RogTheme.spacing-md;
+
+            HorizontalLayout {
+                padding-left: RogTheme.spacing-lg;
+                padding-bottom: RogTheme.spacing-xs;
+                SidebarGroupHeader { text: "SYSTEM"; }
+            }
+
+            SidebarItem {
+                label: "Dashboard";
+                icon: "📊";
+                is-selected: current-item == 0;
+                clicked => { root.item-clicked(0); }
+            }
+
+            SidebarItem {
+                label: "System Control";
+                icon: "⚙️";
+                is-selected: current-item == 1;
+                clicked => { root.item-clicked(1); }
+            }
+
+            SidebarItem {
+                label: "Fan Curves";
+                icon: "💨";
+                is-selected: current-item == 2; // Was 3 previously, re-indexing
+                clicked => { root.item-clicked(2); }
+            }
         }
 
-        Rectangle { height: RogTheme.spacing-md; }
+        // Section: Customization
+        VerticalLayout {
+            spacing: 2px;
+            padding-bottom: RogTheme.spacing-md;
 
-        // Navigation items
-        for item[idx] in items: SidebarItem {
-            label: item;
-            is-selected: current-item == idx;
-            is-available: idx < available.length ? available[idx] : true;
+            HorizontalLayout {
+                padding-left: RogTheme.spacing-lg;
+                padding-bottom: RogTheme.spacing-xs;
+                SidebarGroupHeader { text: "CUSTOMIZATION"; }
+            }
 
-            clicked => {
-                if (idx < available.length ? available[idx] : true) {
-                    current-item = idx;
-                    root.item-clicked(idx);
-                }
+            SidebarItem {
+                label: "Aura RGB";
+                icon: "🌈";
+                is-selected: current-item == 3; // Was 2 previously
+                clicked => { root.item-clicked(3); }
+            }
+
+            SidebarItem {
+                label: "Scenario Profiles";
+                icon: "🎮";
+                is-selected: current-item == 4;
+                is-available: true; // Placeholder but clickable
+                clicked => { root.item-clicked(4); }
+            }
+
+            SidebarItem {
+                label: "AniMe Matrix";
+                icon: "👾";
+                is-selected: current-item == 5;
+                is-available: true; // Placeholder
+                clicked => { root.item-clicked(5); }
+            }
+        }
+
+        // Section: Application
+        VerticalLayout {
+            spacing: 2px;
+
+            HorizontalLayout {
+                padding-left: RogTheme.spacing-lg;
+                padding-bottom: RogTheme.spacing-xs;
+                SidebarGroupHeader { text: "APPLICATION"; }
+            }
+
+            SidebarItem {
+                label: "Settings";
+                icon: "🔧";
+                is-selected: current-item == 6;
+                clicked => { root.item-clicked(6); }
+            }
+
+            SidebarItem {
+                label: "About";
+                icon: "ℹ️";
+                is-selected: current-item == 7;
+                clicked => { root.item-clicked(7); }
             }
         }
 
         // Spacer
         Rectangle { vertical-stretch: 1; }
 
-        // Separator
-        Rectangle {
-            height: 1px;
-            background: RogTheme.border-default;
-        }
-
-        Rectangle { height: RogTheme.spacing-sm; }
-
-        // Quit button at bottom
+        // Quit Button
         SidebarItem {
             label: "Quit App";
+            icon: "🚪";
             is-selected: false;
-            is-available: true;
-
-            clicked => {
-                // This will be connected to quit action
-            }
+            clicked => { root.quit-clicked(); }
         }
     }
 }

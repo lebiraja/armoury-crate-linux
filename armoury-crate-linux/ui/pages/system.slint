@@ -1,14 +1,16 @@
 // System control page - Platform profiles, battery, power controls
-// Gaming-styled controls for ASUS ROG laptops
+// Redesigned with glassmorphism and extended power modes
 
 import { RogTheme } from "../theme.slint";
-import { Slider, ComboBox, Switch } from "std-widgets.slint";
+import { GlassCard, GlassToggle, SectionHeader } from "../widgets/glass_card.slint";
+import { Slider } from "std-widgets.slint";
 
 // System page data bindings
 export global SystemPageData {
-    // Platform profile
+    // Platform profile (0=Balanced, 1=Performance, 2=Quiet)
+    // Extended: 3=Turbo, 4=Manual
     in-out property <int> platform_profile: 0;
-    in-out property <[string]> platform_profile_choices: ["Balanced", "Performance", "Quiet"];
+    in-out property <[string]> platform_profile_choices: ["Balanced", "Performance", "Quiet", "Turbo", "Manual"];
     callback cb_platform_profile(int);
 
     // Charge control
@@ -27,72 +29,24 @@ export global SystemPageData {
     in-out property <int> gpu_mux_mode: 0;
     callback cb_gpu_mux_mode(int);
 
-    // PPT/TDP settings (min/max/current)
+    // PPT/TDP settings (min/max/current) for Manual mode
     in-out property <int> ppt_pl1_spl_min: 5;
     in-out property <int> ppt_pl1_spl_max: 80;
     in-out property <float> ppt_pl1_spl: 30;
+
+    in-out property <int> ppt_pl2_sppt_min: 5;
+    in-out property <int> ppt_pl2_sppt_max: 120;
+    in-out property <float> ppt_pl2_sppt: 45;
+
     callback cb_ppt_pl1_spl(int);
+    callback cb_ppt_pl2_sppt(int);
+
+    // Fan curve selection for Manual mode
+    in-out property <int> fan_profile_mode: 0; // 0=Default, 1=Custom
+    callback cb_fan_profile_mode(int);
 }
 
-// Gaming-styled toggle switch
-component GamingToggle inherits Rectangle {
-    in property <string> label;
-    in-out property <bool> checked: false;
-    callback toggled(bool);
-
-    height: 48px;
-    background: RogTheme.bg-card;
-    border-radius: RogTheme.radius-md;
-    border-width: 1px;
-    border-color: checked ? RogTheme.accent-cyan.with-alpha(0.5) : RogTheme.border-default;
-
-    HorizontalLayout {
-        padding-left: RogTheme.spacing-md;
-        padding-right: RogTheme.spacing-md;
-        spacing: RogTheme.spacing-md;
-
-        Text {
-            text: label;
-            font-size: RogTheme.font-size-body;
-            color: RogTheme.text-primary;
-            vertical-alignment: center;
-        }
-
-        Rectangle { horizontal-stretch: 1; }
-
-        // Toggle track
-        track := Rectangle {
-            width: 48px;
-            height: 24px;
-            border-radius: 12px;
-            background: checked ? RogTheme.accent-cyan.with-alpha(0.3) : RogTheme.bg-tertiary;
-            border-width: 1px;
-            border-color: checked ? RogTheme.accent-cyan : RogTheme.border-default;
-
-            // Toggle knob
-            knob := Rectangle {
-                x: checked ? parent.width - self.width - 4px : 4px;
-                y: (parent.height - self.height) / 2;
-                width: 16px;
-                height: 16px;
-                border-radius: 8px;
-                background: checked ? RogTheme.accent-cyan : RogTheme.text-secondary;
-
-                animate x { duration: RogTheme.anim-fast; easing: ease-out; }
-                animate background { duration: RogTheme.anim-fast; }
-            }
-        }
-    }
-
-    TouchArea {
-        clicked => {
-            checked = !checked;
-            toggled(checked);
-        }
-    }
-}
-
-// Gaming-styled slider
+// Gaming-styled slider with glass effect
 component GamingSlider inherits Rectangle {
     in property <string> label;
     in property <string> unit: "";
@@ -101,11 +55,11 @@ component GamingSlider inherits Rectangle {
     in-out property <float> value: 50;
     callback changed(int);
 
-    height: 80px;
-    background: RogTheme.bg-card;
-    border-radius: RogTheme.radius-md;
+    height: 72px;
+    background: RogTheme.glass-bg;
+    border-radius: RogTheme.glass-radius;
     border-width: 1px;
-    border-color: RogTheme.border-default;
+    border-color: RogTheme.glass-border;
 
     VerticalLayout {
         padding: RogTheme.spacing-md;
@@ -130,32 +84,39 @@ component GamingSlider inherits Rectangle {
             }
         }
 
-        // Slider track
-        track := Rectangle {
-            height: 8px;
-            border-radius: 4px;
-            background: RogTheme.bg-tertiary;
+        // Custom Slider implementation since std-widgets Slider is hard to style perfectly
+        Rectangle {
+            height: 24px; // Hit area
 
-            // Filled portion
+            // Track
             Rectangle {
-                width: parent.width * clamp((value - minimum) / (maximum - minimum), 0, 1);
-                height: 100%;
-                border-radius: parent.border-radius;
-                background: RogTheme.accent-cyan;
+                height: 4px;
+                y: 10px;
+                border-radius: 2px;
+                background: RogTheme.bg-tertiary;
+
+                // Filled portion
+                Rectangle {
+                    x: 0;
+                    width: parent.width * clamp((value - minimum) / (maximum - minimum), 0, 1);
+                    height: 100%;
+                    border-radius: parent.border-radius;
+                    background: RogTheme.accent-cyan;
+                }
             }
 
-            // Slider handle
-            handle := Rectangle {
+            // Handle
+            Rectangle {
                 x: parent.width * clamp((value - minimum) / (maximum - minimum), 0, 1) - self.width / 2;
                 y: (parent.height - self.height) / 2;
-                width: 18px;
-                height: 18px;
-                border-radius: 9px;
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
                 background: RogTheme.accent-cyan;
                 border-width: 2px;
-                border-color: RogTheme.bg-primary;
+                border-color: white;
 
-                drop-shadow-color: RogTheme.accent-cyan.with-alpha(0.3);
+                drop-shadow-color: RogTheme.accent-cyan.with-alpha(0.5);
                 drop-shadow-blur: 8px;
             }
 
@@ -166,6 +127,7 @@ component GamingSlider inherits Rectangle {
                         minimum,
                         maximum
                     );
+                    changed(round(value));
                 }
                 pointer-event(event) => {
                     if event.kind == PointerEventKind.up {
@@ -182,20 +144,25 @@ component ProfileButton inherits Rectangle {
     in property <string> label;
     in property <string> icon: "";
     in property <bool> selected: false;
+    in property <color> accent-color: RogTheme.accent-red;
+
     callback clicked();
 
-    width: 120px;
-    height: 80px;
-    background: selected ? RogTheme.accent-red.with-alpha(0.15) : RogTheme.bg-card;
+    width: 100px;
+    height: 70px;
+    background: selected ? accent-color.with-alpha(0.2) : RogTheme.glass-bg;
     border-radius: RogTheme.radius-md;
-    border-width: 2px;
-    border-color: selected ? RogTheme.accent-red : RogTheme.border-default;
+    border-width: selected ? 2px : 1px;
+    border-color: selected ? accent-color : RogTheme.glass-border;
 
     states [
         hover when touch.has-hover && !selected: {
-            border-color: RogTheme.accent-red.with-alpha(0.5);
+            border-color: accent-color.with-alpha(0.5);
+            background: RogTheme.glass-bg-light;
         }
     ]
+
+    animate background, border-color { duration: RogTheme.anim-fast; }
 
     touch := TouchArea {
         clicked => { root.clicked(); }
@@ -203,20 +170,20 @@ component ProfileButton inherits Rectangle {
 
     VerticalLayout {
         alignment: center;
-        spacing: RogTheme.spacing-xs;
+        spacing: 4px;
 
         Text {
             text: icon;
-            font-size: 24px;
-            color: selected ? RogTheme.accent-red : RogTheme.text-secondary;
+            font-size: 20px;
+            color: selected ? accent-color : RogTheme.text-secondary;
             horizontal-alignment: center;
         }
 
         Text {
             text: label;
-            font-size: RogTheme.font-size-sm;
+            font-size: RogTheme.font-size-xs;
             font-weight: selected ? 700 : 400;
-            color: selected ? RogTheme.accent-red : RogTheme.text-primary;
+            color: selected ? accent-color : RogTheme.text-primary;
             horizontal-alignment: center;
         }
     }
@@ -226,188 +193,242 @@ component ProfileButton inherits Rectangle {
 export component PageSystem inherits Rectangle {
     background: transparent;
 
-    VerticalLayout {
-        padding: RogTheme.spacing-lg;
-        spacing: RogTheme.spacing-lg;
+    Flickable {
+        viewport-height: content.preferred-height;
 
-        // Header
-        Text {
-            text: "System Control";
-            font-size: RogTheme.font-size-h1;
-            font-weight: 700;
-            color: RogTheme.text-primary;
-        }
+        content := VerticalLayout {
+            padding: RogTheme.spacing-lg;
+            spacing: RogTheme.spacing-lg;
 
-        // Platform Profile Section
-        Rectangle {
-            background: RogTheme.bg-secondary;
-            border-radius: RogTheme.radius-lg;
-            border-width: 1px;
-            border-color: RogTheme.border-default;
+            // Header
+            Text {
+                text: "System Control";
+                font-size: RogTheme.font-size-h1;
+                font-weight: 700;
+                color: RogTheme.text-primary;
+            }
 
-            VerticalLayout {
-                padding: RogTheme.spacing-lg;
-                spacing: RogTheme.spacing-md;
+            // Platform Profile Section
+            GlassCard {
+                title: "Operating Mode";
+                accent-color: RogTheme.accent-red;
 
-                Text {
-                    text: "Platform Profile";
-                    font-size: RogTheme.font-size-h3;
-                    font-weight: 600;
-                    color: RogTheme.text-primary;
-                }
-
-                Text {
-                    text: "Select a performance profile based on your usage";
-                    font-size: RogTheme.font-size-sm;
-                    color: RogTheme.text-secondary;
-                }
-
-                HorizontalLayout {
+                VerticalLayout {
                     spacing: RogTheme.spacing-md;
 
-                    ProfileButton {
-                        label: "Quiet";
-                        icon: "🔇";
-                        selected: SystemPageData.platform_profile == 2;
-                        clicked => { SystemPageData.cb_platform_profile(2); }
+                    Text {
+                        text: "Select a performance profile based on your usage";
+                        font-size: RogTheme.font-size-sm;
+                        color: RogTheme.text-secondary;
                     }
 
-                    ProfileButton {
-                        label: "Balanced";
-                        icon: "⚖️";
-                        selected: SystemPageData.platform_profile == 0;
-                        clicked => { SystemPageData.cb_platform_profile(0); }
+                    HorizontalLayout {
+                        spacing: RogTheme.spacing-sm;
+                        alignment: center;
+
+                        ProfileButton {
+                            label: "Quiet";
+                            icon: "🔇";
+                            selected: SystemPageData.platform_profile == 2;
+                            accent-color: RogTheme.accent-cyan; // Blue/Cool for quiet
+                            clicked => { SystemPageData.cb_platform_profile(2); }
+                        }
+
+                        ProfileButton {
+                            label: "Balanced";
+                            icon: "⚖️";
+                            selected: SystemPageData.platform_profile == 0;
+                            accent-color: RogTheme.text-primary; // Neutral for balanced
+                            clicked => { SystemPageData.cb_platform_profile(0); }
+                        }
+
+                        ProfileButton {
+                            label: "Performance";
+                            icon: "🚀";
+                            selected: SystemPageData.platform_profile == 1;
+                            accent-color: RogTheme.accent-orange; // Orange/Warm for performance
+                            clicked => { SystemPageData.cb_platform_profile(1); }
+                        }
+
+                        ProfileButton {
+                            label: "Turbo";
+                            icon: "🔥";
+                            selected: SystemPageData.platform_profile == 3;
+                            accent-color: RogTheme.accent-red; // Red/Hot for Turbo
+                            clicked => { SystemPageData.cb_platform_profile(3); }
+                        }
+
+                        ProfileButton {
+                            label: "Manual";
+                            icon: "⚙️";
+                            selected: SystemPageData.platform_profile == 4;
+                            accent-color: RogTheme.accent-purple; // Purple for custom
+                            clicked => { SystemPageData.cb_platform_profile(4); }
+                        }
                     }
 
-                    ProfileButton {
-                        label: "Performance";
-                        icon: "🚀";
-                        selected: SystemPageData.platform_profile == 1;
-                        clicked => { SystemPageData.cb_platform_profile(1); }
+                    // Manual Mode Controls (Only visible when Manual is selected)
+                    if SystemPageData.platform_profile == 4: Rectangle {
+                        background: RogTheme.bg-tertiary.with-alpha(0.3);
+                        border-radius: RogTheme.radius-md;
+                        border-width: 1px;
+                        border-color: RogTheme.glass-border;
+
+                        VerticalLayout {
+                            padding: RogTheme.spacing-md;
+                            spacing: RogTheme.spacing-md;
+
+                            Text {
+                                text: "Manual Configuration";
+                                font-size: RogTheme.font-size-body;
+                                font-weight: 600;
+                                color: RogTheme.accent-purple;
+                            }
+
+                            GamingSlider {
+                                label: "SPL (Sustained Power Limit)";
+                                unit: "W";
+                                minimum: SystemPageData.ppt_pl1_spl_min * 1.0;
+                                maximum: SystemPageData.ppt_pl1_spl_max * 1.0;
+                                value: SystemPageData.ppt_pl1_spl;
+                                changed(val) => { SystemPageData.cb_ppt_pl1_spl(val); }
+                            }
+
+                            GamingSlider {
+                                label: "SPPT (Slow Package Power Tracking)";
+                                unit: "W";
+                                minimum: SystemPageData.ppt_pl2_sppt_min * 1.0;
+                                maximum: SystemPageData.ppt_pl2_sppt_max * 1.0;
+                                value: SystemPageData.ppt_pl2_sppt;
+                                changed(val) => { SystemPageData.cb_ppt_pl2_sppt(val); }
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        // Battery Section
-        Rectangle {
-            background: RogTheme.bg-secondary;
-            border-radius: RogTheme.radius-lg;
-            border-width: 1px;
-            border-color: RogTheme.border-default;
+            // GPU Mode
+            GlassCard {
+                title: "GPU Mode";
+                accent-color: RogTheme.accent-purple;
 
-            VerticalLayout {
-                padding: RogTheme.spacing-lg;
-                spacing: RogTheme.spacing-md;
+                VerticalLayout {
+                    spacing: RogTheme.spacing-md;
 
-                Text {
-                    text: "Battery Health";
-                    font-size: RogTheme.font-size-h3;
-                    font-weight: 600;
-                    color: RogTheme.text-primary;
+                    Text {
+                        text: "Switch between hybrid and discrete GPU mode (requires reboot)";
+                        font-size: RogTheme.font-size-sm;
+                        color: RogTheme.text-secondary;
+                    }
+
+                    HorizontalLayout {
+                        spacing: RogTheme.spacing-md;
+                        alignment: start;
+
+                        ProfileButton {
+                            label: "Hybrid";
+                            icon: "🔋";
+                            selected: SystemPageData.gpu_mux_mode == 0;
+                            accent-color: RogTheme.accent-green;
+                            clicked => { SystemPageData.cb_gpu_mux_mode(0); }
+                        }
+
+                        ProfileButton {
+                            label: "Discrete";
+                            icon: "🎮";
+                            selected: SystemPageData.gpu_mux_mode == 1;
+                            accent-color: RogTheme.accent-purple;
+                            clicked => { SystemPageData.cb_gpu_mux_mode(1); }
+                        }
+                    }
                 }
+            }
 
-                GamingToggle {
-                    label: "Enable Charge Limit";
-                    checked: SystemPageData.charge_control_enabled;
-                    toggled(enabled) => {
-                        SystemPageData.charge_control_enabled = enabled;
-                        if enabled {
-                            SystemPageData.cb_charge_control_end_threshold(80);
-                        } else {
-                            SystemPageData.cb_charge_control_end_threshold(100);
+            // Battery & Display Section (Grouped for space)
+            HorizontalLayout {
+                spacing: RogTheme.spacing-lg;
+
+                // Battery Section
+                GlassCard {
+                    horizontal-stretch: 1;
+                    title: "Battery Health";
+                    accent-color: RogTheme.accent-green;
+
+                    VerticalLayout {
+                        spacing: RogTheme.spacing-md;
+
+                        HorizontalLayout {
+                            Text {
+                                text: "Charge Limit";
+                                font-size: RogTheme.font-size-body;
+                                vertical-alignment: center;
+                                color: RogTheme.text-primary;
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                            GlassToggle {
+                                checked: SystemPageData.charge_control_enabled;
+                                accent-color: RogTheme.accent-green;
+                                toggled(enabled) => {
+                                    SystemPageData.charge_control_enabled = enabled;
+                                    if enabled {
+                                        SystemPageData.cb_charge_control_end_threshold(80);
+                                    } else {
+                                        SystemPageData.cb_charge_control_end_threshold(100);
+                                    }
+                                }
+                            }
+                        }
+
+                        if SystemPageData.charge_control_enabled: GamingSlider {
+                            label: "Limit Threshold";
+                            unit: "%";
+                            minimum: 40;
+                            maximum: 80;
+                            value: SystemPageData.charge_control_end_threshold;
+                            changed(val) => {
+                                SystemPageData.charge_control_end_threshold = val;
+                                SystemPageData.cb_charge_control_end_threshold(val);
+                            }
                         }
                     }
                 }
 
-                if SystemPageData.charge_control_enabled: GamingSlider {
-                    label: "Charge Limit";
-                    unit: "%";
-                    minimum: 20;
-                    maximum: 100;
-                    value: SystemPageData.charge_control_end_threshold;
-                    changed(val) => {
-                        SystemPageData.charge_control_end_threshold = val;
-                        SystemPageData.cb_charge_control_end_threshold(val);
+                // Display Section
+                GlassCard {
+                    horizontal-stretch: 1;
+                    title: "Display";
+                    accent-color: RogTheme.accent-cyan;
+
+                    VerticalLayout {
+                        spacing: RogTheme.spacing-md;
+
+                        HorizontalLayout {
+                            Text {
+                                text: "Panel Overdrive";
+                                font-size: RogTheme.font-size-body;
+                                vertical-alignment: center;
+                                color: RogTheme.text-primary;
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                            GlassToggle {
+                                checked: SystemPageData.panel_od;
+                                accent-color: RogTheme.accent-cyan;
+                                toggled(enabled) => {
+                                    SystemPageData.panel_od = enabled;
+                                    SystemPageData.cb_panel_od(enabled);
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Improves pixel response time but may cause visual artifacts.";
+                            font-size: RogTheme.font-size-xs;
+                            color: RogTheme.text-tertiary;
+                            wrap: word-wrap;
+                        }
                     }
                 }
             }
         }
-
-        // Display Section
-        Rectangle {
-            background: RogTheme.bg-secondary;
-            border-radius: RogTheme.radius-lg;
-            border-width: 1px;
-            border-color: RogTheme.border-default;
-
-            VerticalLayout {
-                padding: RogTheme.spacing-lg;
-                spacing: RogTheme.spacing-md;
-
-                Text {
-                    text: "Display Settings";
-                    font-size: RogTheme.font-size-h3;
-                    font-weight: 600;
-                    color: RogTheme.text-primary;
-                }
-
-                GamingToggle {
-                    label: "Panel Overdrive";
-                    checked: SystemPageData.panel_od;
-                    toggled(enabled) => {
-                        SystemPageData.panel_od = enabled;
-                        SystemPageData.cb_panel_od(enabled);
-                    }
-                }
-            }
-        }
-
-        // GPU MUX Section
-        Rectangle {
-            background: RogTheme.bg-secondary;
-            border-radius: RogTheme.radius-lg;
-            border-width: 1px;
-            border-color: RogTheme.border-default;
-
-            VerticalLayout {
-                padding: RogTheme.spacing-lg;
-                spacing: RogTheme.spacing-md;
-
-                Text {
-                    text: "GPU Mode";
-                    font-size: RogTheme.font-size-h3;
-                    font-weight: 600;
-                    color: RogTheme.text-primary;
-                }
-
-                Text {
-                    text: "Switch between hybrid and discrete GPU mode (requires reboot)";
-                    font-size: RogTheme.font-size-sm;
-                    color: RogTheme.text-secondary;
-                }
-
-                HorizontalLayout {
-                    spacing: RogTheme.spacing-md;
-
-                    ProfileButton {
-                        label: "Hybrid";
-                        icon: "🔋";
-                        selected: SystemPageData.gpu_mux_mode == 0;
-                        clicked => { SystemPageData.cb_gpu_mux_mode(0); }
-                    }
-
-                    ProfileButton {
-                        label: "Discrete";
-                        icon: "🎮";
-                        selected: SystemPageData.gpu_mux_mode == 1;
-                        clicked => { SystemPageData.cb_gpu_mux_mode(1); }
-                    }
-                }
-            }
-        }
-
-        // Spacer
-        Rectangle { vertical-stretch: 1; }
     }
 }

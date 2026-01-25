@@ -130,6 +130,8 @@ pub fn setup_system_page_callbacks(ui: &MainWindow) {
                         0 => rog_platform::platform::PlatformProfile::Balanced,
                         1 => rog_platform::platform::PlatformProfile::Performance,
                         2 => rog_platform::platform::PlatformProfile::Quiet,
+                        3 => rog_platform::platform::PlatformProfile::Performance, // Turbo mapped to Performance for now
+                        4 => rog_platform::platform::PlatformProfile::Custom,      // Manual mapped to Custom
                         _ => rog_platform::platform::PlatformProfile::Balanced,
                     };
                     match proxy.set_platform_profile(profile_enum).await {
@@ -150,6 +152,58 @@ pub fn setup_system_page_callbacks(ui: &MainWindow) {
                                     ui.invoke_show_toast(msg);
                                 }
                             });
+                        }
+                    }
+                });
+            });
+
+            // PPT SPL (PL1) callback
+            let attrs_inner = armoury_attrs_copy.clone();
+            let handle_inner = handle_copy.clone();
+            ui.global::<SystemPageData>().on_cb_ppt_pl1_spl(move |value| {
+                let attrs = attrs_inner.clone();
+                let h = handle_inner.clone();
+                tokio::spawn(async move {
+                    for attr in attrs {
+                        if let Ok(name) = attr.name().await {
+                            if name == FirmwareAttribute::PptPl1Spl {
+                                if let Err(e) = attr.set_current_value(value as i32).await {
+                                    warn!("Failed to set SPL: {:?}", e);
+                                } else {
+                                    let _ = slint::invoke_from_event_loop(move || {
+                                        if let Some(ui) = h.upgrade() {
+                                            ui.invoke_show_toast(format!("SPL set to {}W", value).into());
+                                        }
+                                    });
+                                }
+                                break;
+                            }
+                        }
+                    }
+                });
+            });
+
+            // PPT SPPT (PL2) callback
+            let attrs_inner = armoury_attrs_copy.clone();
+            let handle_inner = handle_copy.clone();
+            ui.global::<SystemPageData>().on_cb_ppt_pl2_sppt(move |value| {
+                let attrs = attrs_inner.clone();
+                let h = handle_inner.clone();
+                tokio::spawn(async move {
+                    for attr in attrs {
+                        if let Ok(name) = attr.name().await {
+                            if name == FirmwareAttribute::PptPl2Sppt {
+                                if let Err(e) = attr.set_current_value(value as i32).await {
+                                    warn!("Failed to set SPPT: {:?}", e);
+                                } else {
+                                    let _ = slint::invoke_from_event_loop(move || {
+                                        if let Some(ui) = h.upgrade() {
+                                            ui.invoke_show_toast(format!("SPPT set to {}W", value).into());
+                                        }
+                                    });
+                                }
+                                break;
+                            }
                         }
                     }
                 });

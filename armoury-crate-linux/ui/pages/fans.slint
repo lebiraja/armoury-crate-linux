@@ -1,8 +1,9 @@
 // Fan curves page - Custom fan control
-// Gaming-styled fan curve editor for ASUS ROG laptops
+// Redesigned with glassmorphism styling
 
 import { RogTheme } from "../theme.slint";
 import { Graph, Node } from "../widgets/graph.slint";
+import { GlassCard, GlassToggle, GlassButton } from "../widgets/glass_card.slint";
 
 // Re-export Node for Rust code
 export { Node }
@@ -105,14 +106,16 @@ component ProfileTab inherits Rectangle {
 
     height: 40px;
     horizontal-stretch: 1;
-    background: selected ? RogTheme.accent-cyan.with-alpha(0.15) : transparent;
+    background: selected ? RogTheme.accent-cyan.with-alpha(0.2) : transparent;
     border-radius: RogTheme.radius-md;
 
     states [
         hover when touch.has-hover && !selected: {
-            background: RogTheme.bg-tertiary;
+            background: RogTheme.glass-bg-light;
         }
     ]
+
+    animate background { duration: RogTheme.anim-fast; }
 
     touch := TouchArea {
         clicked => { root.clicked(); }
@@ -145,11 +148,13 @@ component FanTab inherits Rectangle {
 
     width: 120px;
     height: 48px;
-    background: selected ? RogTheme.accent-red.with-alpha(0.15) : RogTheme.bg-card;
+    background: selected ? RogTheme.accent-red.with-alpha(0.2) : RogTheme.glass-bg;
     border-radius: RogTheme.radius-md;
     border-width: 2px;
-    border-color: selected ? RogTheme.accent-red : RogTheme.border-default;
+    border-color: selected ? RogTheme.accent-red : RogTheme.glass-border;
     opacity: enabled ? 1.0 : 0.5;
+
+    animate background, border-color { duration: RogTheme.anim-fast; }
 
     touch := TouchArea {
         clicked => { root.clicked(); }
@@ -172,91 +177,6 @@ component FanTab inherits Rectangle {
             font-size: RogTheme.font-size-xs;
             color: enabled ? RogTheme.status-success : RogTheme.text-tertiary;
             horizontal-alignment: center;
-        }
-    }
-}
-
-// Gaming button component
-component GamingButton inherits Rectangle {
-    in property <string> label;
-    in property <color> button_color: RogTheme.accent-cyan;
-    in property <bool> outlined: false;
-    callback clicked();
-
-    height: 40px;
-    min-width: 100px;
-    background: outlined ? transparent : button_color;
-    border-radius: RogTheme.radius-md;
-    border-width: outlined ? 2px : 0px;
-    border-color: button_color;
-
-    states [
-        hover when touch.has-hover: {
-            background: outlined ? button_color.with-alpha(0.15) : button_color.with-alpha(0.8);
-        }
-    ]
-
-    touch := TouchArea {
-        clicked => { root.clicked(); }
-    }
-
-    Text {
-        text: label;
-        font-size: RogTheme.font-size-body;
-        font-weight: 600;
-        color: outlined ? button_color : white;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-}
-
-// Toggle switch
-component FanToggle inherits Rectangle {
-    in property <string> label;
-    in-out property <bool> checked: true;
-    callback toggled(bool);
-
-    height: 40px;
-
-    HorizontalLayout {
-        spacing: RogTheme.spacing-md;
-
-        Text {
-            text: label;
-            font-size: RogTheme.font-size-body;
-            color: RogTheme.text-primary;
-            vertical-alignment: center;
-        }
-
-        Rectangle { horizontal-stretch: 1; }
-
-        // Toggle track
-        track := Rectangle {
-            width: 44px;
-            height: 24px;
-            border-radius: 12px;
-            background: checked ? RogTheme.accent-cyan.with-alpha(0.3) : RogTheme.bg-tertiary;
-            border-width: 1px;
-            border-color: checked ? RogTheme.accent-cyan : RogTheme.border-default;
-
-            knob := Rectangle {
-                x: checked ? parent.width - self.width - 3px : 3px;
-                y: (parent.height - self.height) / 2;
-                width: 18px;
-                height: 18px;
-                border-radius: 9px;
-                background: checked ? RogTheme.accent-cyan : RogTheme.text-secondary;
-
-                animate x { duration: RogTheme.anim-fast; easing: ease-out; }
-            }
-        }
-
-        TouchArea {
-            width: 44px;
-            clicked => {
-                checked = !checked;
-                toggled(checked);
-            }
         }
     }
 }
@@ -311,28 +231,25 @@ export component PageFans inherits Rectangle {
             HorizontalLayout {
                 spacing: RogTheme.spacing-sm;
 
-                GamingButton {
-                    label: "Reset";
-                    button_color: RogTheme.text-secondary;
-                    outlined: true;
+                GlassButton {
+                    text: "Reset";
+                    accent-color: RogTheme.text-secondary;
                     clicked => { FansPageData.cb_reset_defaults(); }
                 }
 
-                GamingButton {
-                    label: "Apply";
-                    button_color: RogTheme.accent-cyan;
+                GlassButton {
+                    text: "Apply";
+                    accent-color: RogTheme.accent-cyan;
+                    selected: true;
                     clicked => { FansPageData.cb_apply_curves(); }
                 }
             }
         }
 
-        // Profile tabs
-        Rectangle {
-            height: 48px;
-            background: RogTheme.bg-secondary;
-            border-radius: RogTheme.radius-lg;
-            border-width: 1px;
-            border-color: RogTheme.border-default;
+        // Profile tabs (Glass Card)
+        GlassCard {
+            compact: true;
+            height: 60px;
 
             HorizontalLayout {
                 padding: RogTheme.spacing-xs;
@@ -379,28 +296,41 @@ export component PageFans inherits Rectangle {
             Rectangle { horizontal-stretch: 1; }
 
             // Enable/disable toggle for selected fan
-            FanToggle {
-                label: FansPageData.selected_fan == 0 ? "CPU Fan Control" : "GPU Fan Control";
-                checked: FansPageData.selected_fan == 0 ? FansPageData.cpu_fan_enabled : FansPageData.gpu_fan_enabled;
-                toggled(enabled) => {
-                    if FansPageData.selected_fan == 0 {
-                        FansPageData.cpu_fan_enabled = enabled;
-                        FansPageData.cb_set_cpu_fan_enabled(enabled);
-                    } else {
-                        FansPageData.gpu_fan_enabled = enabled;
-                        FansPageData.cb_set_gpu_fan_enabled(enabled);
+            HorizontalLayout {
+                spacing: RogTheme.spacing-sm;
+                GlassCard {
+                    compact: true;
+                    HorizontalLayout {
+                        spacing: RogTheme.spacing-md;
+                        Text {
+                            text: FansPageData.selected_fan == 0 ? "CPU Fan Control" : "GPU Fan Control";
+                            font-size: RogTheme.font-size-body;
+                            vertical-alignment: center;
+                            color: RogTheme.text-primary;
+                        }
+
+                        GlassToggle {
+                            checked: FansPageData.selected_fan == 0 ? FansPageData.cpu_fan_enabled : FansPageData.gpu_fan_enabled;
+                            accent-color: RogTheme.accent-cyan;
+                            toggled(enabled) => {
+                                if FansPageData.selected_fan == 0 {
+                                    FansPageData.cpu_fan_enabled = enabled;
+                                    FansPageData.cb_set_cpu_fan_enabled(enabled);
+                                } else {
+                                    FansPageData.gpu_fan_enabled = enabled;
+                                    FansPageData.cb_set_gpu_fan_enabled(enabled);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
         // Fan curve graph - Interactive draggable curve editor
-        Rectangle {
+        GlassCard {
             vertical-stretch: 1;
-            background: RogTheme.bg-card;
-            border-radius: RogTheme.radius-lg;
-            border-width: 1px;
-            border-color: RogTheme.border-default;
+            accent-color: FansPageData.selected_fan == 0 ? RogTheme.accent-cyan : RogTheme.accent-purple;
 
             // Select the correct curve based on profile and fan selection
             property <[Node]> current_curve:

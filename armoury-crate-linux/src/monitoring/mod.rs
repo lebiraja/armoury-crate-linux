@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::{debug, warn};
-use sysinfo::System;
+use sysinfo::{System, Disks};
 use tokio::sync::RwLock;
 
 #[cfg(feature = "nvidia")]
@@ -49,6 +49,12 @@ pub struct MonitoringData {
     pub battery_percent: Option<f32>,
     /// Whether on AC power
     pub on_ac_power: bool,
+    /// Disk usage percentage
+    pub disk_usage: f32,
+    /// Total disk space in GB
+    pub disk_total_gb: f32,
+    /// Used disk space in GB
+    pub disk_used_gb: f32,
 }
 
 /// History buffer for monitoring data
@@ -409,6 +415,7 @@ pub struct SystemMonitor {
     data: Arc<RwLock<MonitoringData>>,
     history: Arc<RwLock<MonitoringHistory>>,
     sys: Arc<RwLock<System>>,
+    disks: Arc<RwLock<Disks>>,
     hwmon: Arc<RwLock<HwmonPaths>>,
     update_interval: Duration,
     running: Arc<RwLock<bool>>,
@@ -427,6 +434,7 @@ impl SystemMonitor {
             data: Arc::new(RwLock::new(MonitoringData::default())),
             history: Arc::new(RwLock::new(MonitoringHistory::new(max_entries))),
             sys: Arc::new(RwLock::new(System::new_all())),
+            disks: Arc::new(RwLock::new(Disks::new_with_refreshed_list())),
             hwmon: Arc::new(RwLock::new(HwmonPaths::new())),
             update_interval: Duration::from_millis(update_interval_ms),
             running: Arc::new(RwLock::new(false)),
@@ -438,6 +446,7 @@ impl SystemMonitor {
         let data = self.data.clone();
         let history = self.history.clone();
         let sys = self.sys.clone();
+        let disks = self.disks.clone();
         let hwmon = self.hwmon.clone();
         let interval = self.update_interval;
         let running = self.running.clone();
@@ -447,6 +456,7 @@ impl SystemMonitor {
 
         tokio::spawn(async move {
             let mut interval_timer = tokio::time::interval(interval);
+            let mut disk_update_counter = 0;
 
             loop {
                 interval_timer.tick().await;
@@ -462,11 +472,19 @@ impl SystemMonitor {
                     sys.refresh_all();
                 }
 
+                // Update disks every 10 seconds (expensive operation)
+                if disk_update_counter % 10 == 0 {
+                    let mut disks = disks.write().await;
+                    disks.refresh_list();
+                }
+                disk_update_counter += 1;
+
                 // Collect metrics
                 let new_data = {
                     let sys = sys.read().await;
+                    let disks = disks.read().await;
                     let hwmon = hwmon.read().await;
-                    collect_metrics(&sys, &hwmon)
+                    collect_metrics(&sys, &disks, &hwmon)
                 };
 
                 // Update data and history
@@ -504,7 +522,7 @@ impl SystemMonitor {
     }
 }
 
-fn collect_metrics(sys: &System, hwmon: &HwmonPaths) -> MonitoringData {
+fn collect_metrics(sys: &System, disks: &Disks, hwmon: &HwmonPaths) -> MonitoringData {
     // Calculate CPU usage from global CPU info
     let cpu_usage = sys.global_cpu_info().cpu_usage();
 
@@ -522,6 +540,25 @@ fn collect_metrics(sys: &System, hwmon: &HwmonPaths) -> MonitoringData {
     let ram_used_gb = (used_memory / 1024.0 / 1024.0 / 1024.0) as f32;
     let ram_usage = if total_memory > 0.0 {
         ((used_memory / total_memory) * 100.0) as f32
+    } else {
+        0.0
+    };
+
+    // Get Disk usage (Root partition /)
+    let mut disk_total_bytes = 0;
+    let mut disk_available_bytes = 0;
+    for disk in disks {
+        if disk.mount_point() == Path::new("/") {
+            disk_total_bytes = disk.total_space();
+            disk_available_bytes = disk.available_space();
+            break;
+        }
+    }
+    let disk_total_gb = (disk_total_bytes as f64 / 1024.0 / 1024.0 / 1024.0) as f32;
+    let disk_used_bytes = disk_total_bytes - disk_available_bytes;
+    let disk_used_gb = (disk_used_bytes as f64 / 1024.0 / 1024.0 / 1024.0) as f32;
+    let disk_usage = if disk_total_bytes > 0 {
+        ((disk_used_bytes as f64 / disk_total_bytes as f64) * 100.0) as f32
     } else {
         0.0
     };
@@ -550,6 +587,9 @@ fn collect_metrics(sys: &System, hwmon: &HwmonPaths) -> MonitoringData {
         power_draw_watts: 0.0,
         battery_percent: read_battery_percent(),
         on_ac_power: read_ac_power_status(),
+        disk_usage,
+        disk_total_gb,
+        disk_used_gb,
     }
 }
 

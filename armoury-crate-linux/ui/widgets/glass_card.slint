@@ -1,0 +1,330 @@
+// Glassmorphism Card Component for Armoury Crate Linux
+// Reusable semi-transparent card with subtle borders and shadows
+
+import { RogTheme } from "../theme.slint";
+
+// Main glass card container
+export component GlassCard inherits Rectangle {
+    in property <string> title: "";
+    in property <bool> show-header: title != "";
+    in property <bool> compact: false;
+    in property <color> accent-color: RogTheme.accent-red;
+
+    background: RogTheme.glass-bg;
+    border-radius: RogTheme.glass-radius;
+    border-width: 1px;
+    border-color: RogTheme.glass-border;
+
+    // Drop shadow for depth
+    drop-shadow-color: RogTheme.glass-shadow;
+    drop-shadow-blur: RogTheme.shadow-md;
+    drop-shadow-offset-y: 4px;
+
+    // Top highlight edge for glass effect
+    Rectangle {
+        x: RogTheme.spacing-md;
+        y: 1px;
+        width: parent.width - RogTheme.spacing-lg;
+        height: 1px;
+        background: @linear-gradient(90deg,
+            RogTheme.glass-highlight 0%,
+            rgba(255, 255, 255, 0.08) 50%,
+            RogTheme.glass-highlight 100%
+        );
+        border-radius: 1px;
+    }
+
+    // Left accent bar (optional, appears on hover or when active)
+    Rectangle {
+        x: 0;
+        y: parent.height * 0.2;
+        width: 3px;
+        height: parent.height * 0.6;
+        background: accent-color;
+        border-radius: 2px;
+        opacity: 0;
+
+        animate opacity { duration: RogTheme.anim-fast; }
+    }
+
+    // Content layout
+    VerticalLayout {
+        padding: compact ? RogTheme.spacing-md : RogTheme.card-padding;
+        spacing: compact ? RogTheme.spacing-sm : RogTheme.spacing-md;
+
+        // Header (if title provided)
+        if show-header: HorizontalLayout {
+            spacing: RogTheme.spacing-sm;
+
+            Text {
+                text: title;
+                font-size: RogTheme.font-size-lg;
+                font-weight: RogTheme.font-weight-semibold;
+                color: RogTheme.text-primary;
+                vertical-alignment: center;
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+        }
+
+        // Content slot
+        @children
+    }
+}
+
+// Glass card with hover effect
+export component GlassCardHover inherits Rectangle {
+    in property <string> title: "";
+    in property <bool> show-header: title != "";
+    in property <bool> selected: false;
+    in property <color> accent-color: RogTheme.accent-cyan;
+
+    callback clicked();
+
+    background: selected ? accent-color.with-alpha(0.15) : RogTheme.glass-bg;
+    border-radius: RogTheme.glass-radius;
+    border-width: selected ? 2px : 1px;
+    border-color: selected ? accent-color : RogTheme.glass-border;
+
+    drop-shadow-color: selected ? accent-color.with-alpha(0.3) : RogTheme.glass-shadow;
+    drop-shadow-blur: selected ? RogTheme.shadow-lg : RogTheme.shadow-md;
+    drop-shadow-offset-y: selected ? 6px : 4px;
+
+    states [
+        hover when touch.has-hover && !selected: {
+            background: RogTheme.glass-bg-light;
+            border-color: RogTheme.glass-border-active;
+            in {
+                animate background { duration: RogTheme.anim-fast; }
+                animate border-color { duration: RogTheme.anim-fast; }
+            }
+        }
+        pressed when touch.pressed: {
+            background: accent-color.with-alpha(0.1);
+        }
+    ]
+
+    animate background, border-color, drop-shadow-blur { duration: RogTheme.anim-fast; }
+
+    // Top highlight
+    Rectangle {
+        x: RogTheme.spacing-md;
+        y: 1px;
+        width: parent.width - RogTheme.spacing-lg;
+        height: 1px;
+        background: RogTheme.glass-highlight;
+        border-radius: 1px;
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    VerticalLayout {
+        padding: RogTheme.card-padding;
+        spacing: RogTheme.spacing-md;
+
+        if show-header: Text {
+            text: title;
+            font-size: RogTheme.font-size-lg;
+            font-weight: RogTheme.font-weight-semibold;
+            color: selected ? accent-color : RogTheme.text-primary;
+        }
+
+        @children
+    }
+}
+
+// Small glass button
+export component GlassButton inherits Rectangle {
+    in property <string> text: "";
+    in property <string> icon: "";
+    in property <bool> selected: false;
+    in property <color> accent-color: RogTheme.accent-cyan;
+
+    callback clicked();
+
+    min-width: 80px;
+    min-height: 40px;
+    background: selected ? accent-color.with-alpha(0.2) : RogTheme.glass-bg;
+    border-radius: RogTheme.radius-md;
+    border-width: selected ? 2px : 1px;
+    border-color: selected ? accent-color : RogTheme.glass-border;
+
+    drop-shadow-color: selected ? accent-color.with-alpha(0.3) : #00000000;
+    drop-shadow-blur: selected ? RogTheme.shadow-sm : 0;
+
+    states [
+        hover when touch.has-hover && !selected: {
+            background: RogTheme.glass-bg-light;
+            border-color: accent-color.with-alpha(0.5);
+        }
+        pressed when touch.pressed: {
+            background: accent-color.with-alpha(0.25);
+        }
+    ]
+
+    animate background, border-color, drop-shadow-blur { duration: RogTheme.anim-fast; }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: RogTheme.spacing-xs;
+        padding: RogTheme.spacing-sm;
+
+        if icon != "": Text {
+            text: icon;
+            font-size: 18px;
+            vertical-alignment: center;
+        }
+
+        if text != "": Text {
+            text: text;
+            font-size: RogTheme.font-size-sm;
+            font-weight: selected ? RogTheme.font-weight-semibold : RogTheme.font-weight-normal;
+            color: selected ? accent-color : RogTheme.text-primary;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// Glass toggle switch
+export component GlassToggle inherits Rectangle {
+    in-out property <bool> checked: false;
+    in property <color> accent-color: RogTheme.accent-cyan;
+
+    callback toggled(bool);
+
+    width: 52px;
+    height: 28px;
+    background: checked ? accent-color.with-alpha(0.3) : RogTheme.glass-bg;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: checked ? accent-color : RogTheme.glass-border;
+
+    drop-shadow-color: checked ? accent-color.with-alpha(0.3) : #00000000;
+    drop-shadow-blur: checked ? RogTheme.shadow-sm : 0;
+
+    animate background, border-color, drop-shadow-blur { duration: RogTheme.anim-normal; }
+
+    // Knob
+    Rectangle {
+        x: checked ? parent.width - self.width - 4px : 4px;
+        y: 4px;
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        background: checked ? accent-color : RogTheme.text-secondary;
+
+        drop-shadow-color: checked ? accent-color.with-alpha(0.5) : #00000033;
+        drop-shadow-blur: 4px;
+
+        animate x, background { duration: RogTheme.anim-normal; easing: ease-out; }
+    }
+
+    TouchArea {
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled(root.checked);
+        }
+    }
+}
+
+// Glass progress bar
+export component GlassProgress inherits Rectangle {
+    in property <float> value: 0.5;  // 0.0 to 1.0
+    in property <color> bar-color: RogTheme.accent-cyan;
+    in property <string> label: "";
+    in property <string> value-text: "";
+
+    height: 32px;
+    background: RogTheme.glass-bg;
+    border-radius: RogTheme.radius-md;
+    border-width: 1px;
+    border-color: RogTheme.glass-border;
+
+    HorizontalLayout {
+        padding-left: RogTheme.spacing-md;
+        padding-right: RogTheme.spacing-md;
+        spacing: RogTheme.spacing-md;
+
+        if label != "": Text {
+            text: label;
+            font-size: RogTheme.font-size-sm;
+            color: RogTheme.text-secondary;
+            vertical-alignment: center;
+            width: 60px;
+        }
+
+        // Track
+        Rectangle {
+            height: 8px;
+            border-radius: 4px;
+            background: RogTheme.bg-tertiary;
+
+            // Fill
+            Rectangle {
+                width: clamp(value, 0, 1) * parent.width;
+                height: 100%;
+                border-radius: 4px;
+                background: @linear-gradient(90deg, bar-color.darker(0.2), bar-color);
+
+                animate width { duration: RogTheme.anim-normal; }
+            }
+        }
+
+        if value-text != "": Text {
+            text: value-text;
+            font-size: RogTheme.font-size-sm;
+            font-weight: RogTheme.font-weight-medium;
+            color: bar-color;
+            vertical-alignment: center;
+            min-width: 80px;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+// Section divider
+export component GlassDivider inherits Rectangle {
+    height: 1px;
+    background: @linear-gradient(90deg,
+        #00000000 0%,
+        RogTheme.glass-border 20%,
+        RogTheme.glass-border 80%,
+        #00000000 100%
+    );
+}
+
+// Section header
+export component SectionHeader inherits Rectangle {
+    in property <string> title: "";
+    in property <string> icon: "";
+
+    height: 32px;
+    background: #00000000;
+
+    HorizontalLayout {
+        spacing: RogTheme.spacing-sm;
+
+        if icon != "": Text {
+            text: icon;
+            font-size: 18px;
+            vertical-alignment: center;
+            color: RogTheme.accent-cyan;
+        }
+
+        Text {
+            text: title;
+            font-size: RogTheme.font-size-lg;
+            font-weight: RogTheme.font-weight-semibold;
+            color: RogTheme.text-primary;
+            vertical-alignment: center;
+        }
+
+        Rectangle { horizontal-stretch: 1; }
+    }
+}

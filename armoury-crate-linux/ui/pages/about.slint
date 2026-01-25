@@ -1,9 +1,11 @@
 // About page - Shows version and project information
+// Redesigned with glassmorphism
 
 import { RogTheme } from "../theme.slint";
+import { GlassCard, GlassDivider } from "../widgets/glass_card.slint";
 
 export component PageAbout inherits Rectangle {
-    background: RogTheme.bg-primary;
+    background: transparent;
 
     VerticalLayout {
         padding: RogTheme.spacing-lg;
@@ -19,14 +21,10 @@ export component PageAbout inherits Rectangle {
         }
 
         // Content card
-        Rectangle {
-            background: RogTheme.bg-card;
-            border-radius: RogTheme.radius-lg;
-            border-width: 1px;
-            border-color: RogTheme.border-default;
+        GlassCard {
+            accent-color: RogTheme.accent-cyan;
 
             VerticalLayout {
-                padding: RogTheme.spacing-xl;
                 spacing: RogTheme.spacing-lg;
 
                 // Title
@@ -47,11 +45,7 @@ export component PageAbout inherits Rectangle {
                     }
                 }
 
-                // Separator
-                Rectangle {
-                    height: 1px;
-                    background: RogTheme.border-default;
-                }
+                GlassDivider {}
 
                 // Description
                 Text {
@@ -87,11 +81,7 @@ export component PageAbout inherits Rectangle {
                     }
                 }
 
-                // Separator
-                Rectangle {
-                    height: 1px;
-                    background: RogTheme.border-default;
-                }
+                GlassDivider {}
 
                 // Links and info
                 VerticalLayout {
