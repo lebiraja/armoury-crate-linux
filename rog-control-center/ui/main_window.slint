@@ -8,6 +8,9 @@ import { PageAnime, AnimePageData } from "pages/anime.slint";
 import { RogItem } from "widgets/common.slint";
 import { PageAura } from "pages/aura.slint";
 import { Node } from "widgets/graph.slint";
+import { PageDashboard, DashboardData } from "pages/dashboard.slint";
+import { PageScenario, ScenarioData } from "pages/scenario.slint";
+
 export { Node }
 import { FanPageData, FanType, Profile } from "types/fan_types.slint";
 export { FanPageData, FanType, Profile }
@@ -15,7 +18,7 @@ import { AuraPageData, AuraDevType, LaptopAuraPower, AuraPowerState, PowerZones,
 export { AuraPageData, AuraDevType, LaptopAuraPower, AuraPowerState, PowerZones, AuraEffect }
 import { PageAppSettings, AppSettingsPageData } from "pages/app_settings.slint";
 
-export { AppSize, AttrMinMax, SystemPageData, AnimePageData, AppSettingsPageData }
+export { AppSize, AttrMinMax, SystemPageData, AnimePageData, AppSettingsPageData, DashboardData, ScenarioData }
 
 export component MainWindow inherits Window {
     title: "ROG Control";
@@ -24,7 +27,7 @@ export component MainWindow inherits Window {
     default-font-size: 14px;
     default-font-weight: 400;
     icon: @image-url("../data/rog-control-center.png");
-    in property <[bool]> sidebar_items_avilable: [true, true, true, true, true, true];
+    in property <[bool]> sidebar_items_avilable: [true, true, true, true, true, true, true, true];
     private property <bool> show_notif;
     private property <bool> fade_cover;
     private property <bool> toast: false;
@@ -54,12 +57,14 @@ export component MainWindow inherits Window {
             side-bar := SideBar {
                 title: @tr("ROG");
                 model: [
+                    @tr("Menu0" => "Dashboard"),
                     @tr("Menu1" => "System Control"),
                     @tr("Menu2" => "Keyboard Aura"),
                     @tr("Menu3" => "AniMe Matrix"),
                     @tr("Menu4" => "Fan Curves"),
-                    @tr("Menu5" => "App Settings"),
-                    @tr("Menu6" => "About"),
+                    @tr("Menu5" => "Scenario Profiles"),
+                    @tr("Menu6" => "App Settings"),
+                    @tr("Menu7" => "About"),
                 ];
                 available: root.sidebar_items_avilable;
             }
@@ -84,30 +89,40 @@ export component MainWindow inherits Window {
 
         Rectangle {
             background: Palette.background;
-            if(side-bar.current-item == 0): page := PageSystem {
+            
+            if(side-bar.current-item == 0): PageDashboard {
+                width: root.width - side-bar.width;
+                height: root.height + 12px;
+            }
+            
+            if(side-bar.current-item == 1): page := PageSystem {
                 width: root.width - side-bar.width;
                 height: root.height + 12px;
             }
 
             aura := PageAura {
                 width: root.width - side-bar.width;
-                visible: side-bar.current-item == 1;
+                visible: side-bar.current-item == 2;
             }
 
-            if(side-bar.current-item == 2): PageAnime {
+            if(side-bar.current-item == 3): PageAnime {
                 width: root.width - side-bar.width;
             }
 
             fans := PageFans {
                 width: root.width - side-bar.width;
-                visible: side-bar.current-item == 3;
+                visible: side-bar.current-item == 4;
             }
 
-            if(side-bar.current-item == 4): PageAppSettings {
+            if(side-bar.current-item == 5): PageScenario {
                 width: root.width - side-bar.width;
             }
 
-            if(side-bar.current-item == 5): PageAbout {
+            if(side-bar.current-item == 6): PageAppSettings {
+                width: root.width - side-bar.width;
+            }
+
+            if(side-bar.current-item == 7): PageAbout {
                 width: root.width - side-bar.width;
             }
 

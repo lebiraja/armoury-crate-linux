@@ -2,6 +2,8 @@ pub mod setup_anime;
 pub mod setup_aura;
 pub mod setup_fans;
 pub mod setup_system;
+pub mod setup_dashboard;
+pub mod setup_scenario;
 
 use std::sync::{Arc, Mutex};
 
@@ -15,6 +17,8 @@ use crate::ui::setup_anime::setup_anime_page;
 use crate::ui::setup_aura::setup_aura_page;
 use crate::ui::setup_fans::setup_fan_curve_page;
 use crate::ui::setup_system::{setup_system_page, setup_system_page_callbacks};
+use crate::ui::setup_dashboard::setup_dashboard_page;
+use crate::ui::setup_scenario::setup_scenario_page;
 use crate::{AppSettingsPageData, MainWindow};
 
 // this macro sets up:
@@ -97,13 +101,14 @@ pub fn setup_window(config: Arc<Mutex<Config>>) -> MainWindow {
     let available = list_iface_blocking().unwrap_or_default();
     ui.set_sidebar_items_avilable(
         [
-            // Needs to match the order of slint sidebar items
+            true, // Dashboard
             available.contains(&"xyz.ljones.Platform".to_string()),
             available.contains(&"xyz.ljones.Aura".to_string()),
             available.contains(&"xyz.ljones.Anime".to_string()),
             available.contains(&"xyz.ljones.FanCurves".to_string()),
-            true,
-            true,
+            true, // Scenario
+            true, // Settings
+            true, // About
         ]
         .into(),
     );
@@ -113,6 +118,9 @@ pub fn setup_window(config: Arc<Mutex<Config>>) -> MainWindow {
     });
 
     setup_app_settings_page(&ui, config.clone());
+    setup_dashboard_page(&ui);
+    setup_scenario_page(&ui);
+
     if available.contains(&"xyz.ljones.Platform".to_string()) {
         setup_system_page(&ui, config.clone());
         setup_system_page_callbacks(&ui, config.clone());

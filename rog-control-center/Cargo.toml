@@ -43,6 +43,7 @@ dirs.workspace = true
 notify-rust.workspace = true
 concat-idents.workspace = true
 futures-util.workspace = true
+sysinfo = "0.30"
 
 versions.workspace = true
 

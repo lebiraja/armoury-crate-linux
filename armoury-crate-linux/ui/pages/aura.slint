@@ -11,9 +11,22 @@ export global AuraPageData {
     in-out property <int> brightness: 2;
     callback cb_brightness(int);
 
-    // LED mode
+    // LED mode (AuraModeNum values)
     in-out property <int> led_mode: 0;
-    in-out property <[string]> available_modes: ["Static", "Breathe", "Strobe", "Rainbow", "Pulse"];
+    in-out property <[string]> available_modes: [
+        "Static",      // 0
+        "Breathe",     // 1
+        "RainbowCycle", // 2
+        "RainbowWave", // 3
+        "Star",        // 4
+        "Rain",        // 5
+        "Highlight",   // 6
+        "Laser",       // 7
+        "Ripple",      // 8
+        "Pulse",       // 10
+        "Comet",       // 11
+        "Flash"        // 12
+    ];
     callback cb_led_mode(int);
 
     // LED speed (0=Low, 1=Med, 2=High)
@@ -286,6 +299,7 @@ export component PageAura inherits Rectangle {
             border-radius: RogTheme.radius-lg;
             border-width: 1px;
             border-color: RogTheme.border-default;
+            vertical-stretch: 1;
 
             VerticalLayout {
                 padding: RogTheme.spacing-lg;
@@ -298,6 +312,7 @@ export component PageAura inherits Rectangle {
                     color: RogTheme.text-primary;
                 }
 
+                // Row 1: Static, Breathe, RainbowCycle, RainbowWave
                 HorizontalLayout {
                     spacing: RogTheme.spacing-sm;
 
@@ -314,21 +329,73 @@ export component PageAura inherits Rectangle {
                     }
 
                     ModeCard {
-                        name: "Strobe";
+                        name: "Rainbow\nCycle";
                         selected: AuraPageData.led_mode == 2;
                         clicked => { AuraPageData.led_mode = 2; AuraPageData.cb_led_mode(2); }
                     }
 
                     ModeCard {
-                        name: "Rainbow";
+                        name: "Rainbow\nWave";
                         selected: AuraPageData.led_mode == 3;
                         clicked => { AuraPageData.led_mode = 3; AuraPageData.cb_led_mode(3); }
+                    }
+                }
+
+                // Row 2: Star, Rain, Highlight, Laser
+                HorizontalLayout {
+                    spacing: RogTheme.spacing-sm;
+
+                    ModeCard {
+                        name: "Star";
+                        selected: AuraPageData.led_mode == 4;
+                        clicked => { AuraPageData.led_mode = 4; AuraPageData.cb_led_mode(4); }
+                    }
+
+                    ModeCard {
+                        name: "Rain";
+                        selected: AuraPageData.led_mode == 5;
+                        clicked => { AuraPageData.led_mode = 5; AuraPageData.cb_led_mode(5); }
+                    }
+
+                    ModeCard {
+                        name: "Highlight";
+                        selected: AuraPageData.led_mode == 6;
+                        clicked => { AuraPageData.led_mode = 6; AuraPageData.cb_led_mode(6); }
+                    }
+
+                    ModeCard {
+                        name: "Laser";
+                        selected: AuraPageData.led_mode == 7;
+                        clicked => { AuraPageData.led_mode = 7; AuraPageData.cb_led_mode(7); }
+                    }
+                }
+
+                // Row 3: Ripple, Pulse, Comet, Flash
+                HorizontalLayout {
+                    spacing: RogTheme.spacing-sm;
+
+                    ModeCard {
+                        name: "Ripple";
+                        selected: AuraPageData.led_mode == 8;
+                        clicked => { AuraPageData.led_mode = 8; AuraPageData.cb_led_mode(8); }
                     }
 
                     ModeCard {
                         name: "Pulse";
-                        selected: AuraPageData.led_mode == 4;
-                        clicked => { AuraPageData.led_mode = 4; AuraPageData.cb_led_mode(4); }
+                        selected: AuraPageData.led_mode == 10;
+                        clicked => { AuraPageData.led_mode = 10; AuraPageData.cb_led_mode(10); }
+                    }
+
+                    ModeCard {
+                        name: "Comet";
+                        selected: AuraPageData.led_mode == 11;
+                        clicked => { AuraPageData.led_mode = 11; AuraPageData.cb_led_mode(11); }
+                    }
+
+                    ModeCard {
+                        name: "Flash";
+                        selected: AuraPageData.led_mode == 12;
+                        clicked => { AuraPageData.led_mode = 12; AuraPageData.cb_led_mode(12); }
                     }
                 }
 
@@ -502,8 +569,5 @@ export component PageAura inherits Rectangle {
                 }
             }
         }
-
-        // Spacer
-        Rectangle { vertical-stretch: 1; }
     }
 }

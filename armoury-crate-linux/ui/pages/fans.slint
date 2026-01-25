@@ -2,8 +2,12 @@
 // Gaming-styled fan curve editor for ASUS ROG laptops
 
 import { RogTheme } from "../theme.slint";
+import { Graph, Node } from "../widgets/graph.slint";
 
-// Fan curve point structure
+// Re-export Node for Rust code
+export { Node }
+
+// Fan curve point structure (legacy, kept for compatibility)
 export struct FanCurvePoint {
     temp: int,
     pwm: int,
@@ -16,30 +20,70 @@ export global FansPageData {
     // Selected profile (0=Balanced, 1=Performance, 2=Quiet)
     in-out property <int> selected_profile: 0;
 
-    // CPU fan
+    // CPU fan - using Node for graph compatibility (x=temp, y=pwm*1px where pwm 0-255)
     in-out property <bool> cpu_fan_enabled: true;
-    in-out property <[FanCurvePoint]> cpu_fan_curve: [
-        { temp: 20, pwm: 0 },
-        { temp: 30, pwm: 10 },
-        { temp: 40, pwm: 20 },
-        { temp: 50, pwm: 30 },
-        { temp: 60, pwm: 50 },
-        { temp: 70, pwm: 70 },
-        { temp: 80, pwm: 90 },
-        { temp: 100, pwm: 100 },
+    in-out property <[Node]> cpu_fan_curve_balanced: [
+        { x: 20px, y: 0px },
+        { x: 30px, y: 26px },
+        { x: 40px, y: 51px },
+        { x: 50px, y: 77px },
+        { x: 60px, y: 128px },
+        { x: 70px, y: 179px },
+        { x: 80px, y: 230px },
+        { x: 100px, y: 255px },
+    ];
+    in-out property <[Node]> cpu_fan_curve_performance: [
+        { x: 20px, y: 51px },
+        { x: 30px, y: 77px },
+        { x: 40px, y: 102px },
+        { x: 50px, y: 128px },
+        { x: 60px, y: 179px },
+        { x: 70px, y: 204px },
+        { x: 80px, y: 230px },
+        { x: 100px, y: 255px },
+    ];
+    in-out property <[Node]> cpu_fan_curve_quiet: [
+        { x: 20px, y: 0px },
+        { x: 30px, y: 0px },
+        { x: 40px, y: 26px },
+        { x: 50px, y: 51px },
+        { x: 60px, y: 77px },
+        { x: 70px, y: 128px },
+        { x: 80px, y: 179px },
+        { x: 100px, y: 230px },
     ];
 
-    // GPU fan
+    // GPU fan - using Node for graph compatibility
     in-out property <bool> gpu_fan_enabled: true;
-    in-out property <[FanCurvePoint]> gpu_fan_curve: [
-        { temp: 20, pwm: 0 },
-        { temp: 30, pwm: 10 },
-        { temp: 40, pwm: 20 },
-        { temp: 50, pwm: 30 },
-        { temp: 60, pwm: 50 },
-        { temp: 70, pwm: 70 },
-        { temp: 80, pwm: 90 },
-        { temp: 100, pwm: 100 },
+    in-out property <[Node]> gpu_fan_curve_balanced: [
+        { x: 20px, y: 0px },
+        { x: 30px, y: 26px },
+        { x: 40px, y: 51px },
+        { x: 50px, y: 77px },
+        { x: 60px, y: 128px },
+        { x: 70px, y: 179px },
+        { x: 80px, y: 230px },
+        { x: 100px, y: 255px },
+    ];
+    in-out property <[Node]> gpu_fan_curve_performance: [
+        { x: 20px, y: 51px },
+        { x: 30px, y: 77px },
+        { x: 40px, y: 102px },
+        { x: 50px, y: 128px },
+        { x: 60px, y: 179px },
+        { x: 70px, y: 204px },
+        { x: 80px, y: 230px },
+        { x: 100px, y: 255px },
+    ];
+    in-out property <[Node]> gpu_fan_curve_quiet: [
+        { x: 20px, y: 0px },
+        { x: 30px, y: 0px },
+        { x: 40px, y: 26px },
+        { x: 50px, y: 51px },
+        { x: 60px, y: 77px },
+        { x: 70px, y: 128px },
+        { x: 80px, y: 179px },
+        { x: 100px, y: 230px },
     ];
 
     // Currently selected fan (0=CPU, 1=GPU)
@@ -50,6 +94,7 @@ export global FansPageData {
     callback cb_reset_defaults();
     callback cb_set_cpu_fan_enabled(bool);
     callback cb_set_gpu_fan_enabled(bool);
+    callback cb_profile_changed(int);
 }
 
 // Profile tab button
@@ -216,125 +261,6 @@ component FanToggle inherits Rectangle {
     }
 }
 
-// Fan curve point display row
-component CurvePointRow inherits Rectangle {
-    in property <int> index;
-    in property <int> temp;
-    in property <int> pwm;
-    in property <color> accent: RogTheme.accent-red;
-
-    height: 36px;
-    background: RogTheme.bg-tertiary.with-alpha(0.5);
-    border-radius: RogTheme.radius-sm;
-
-    HorizontalLayout {
-        padding-left: RogTheme.spacing-md;
-        padding-right: RogTheme.spacing-md;
-        spacing: RogTheme.spacing-lg;
-
-        Text {
-            text: "Point " + (index + 1);
-            font-size: RogTheme.font-size-sm;
-            color: RogTheme.text-tertiary;
-            vertical-alignment: center;
-            width: 60px;
-        }
-
-        Text {
-            text: temp + "°C";
-            font-size: RogTheme.font-size-body;
-            font-weight: 600;
-            color: RogTheme.text-primary;
-            vertical-alignment: center;
-            width: 60px;
-        }
-
-        // Visual bar for PWM
-        Rectangle {
-            horizontal-stretch: 1;
-            height: 12px;
-            border-radius: 6px;
-            background: RogTheme.bg-card;
-
-            Rectangle {
-                width: parent.width * (pwm / 100.0);
-                height: 100%;
-                border-radius: parent.border-radius;
-                background: accent;
-            }
-        }
-
-        Text {
-            text: pwm + "%";
-            font-size: RogTheme.font-size-body;
-            font-weight: 600;
-            color: accent;
-            vertical-alignment: center;
-            width: 50px;
-            horizontal-alignment: right;
-        }
-    }
-}
-
-// Simple bar-based fan curve visualization
-component FanCurveVisualization inherits Rectangle {
-    in property <[FanCurvePoint]> curve;
-    in property <color> curve_color: RogTheme.accent-red;
-
-    background: RogTheme.bg-card;
-    border-radius: RogTheme.radius-lg;
-    border-width: 1px;
-    border-color: RogTheme.border-default;
-
-    VerticalLayout {
-        padding: RogTheme.spacing-md;
-        spacing: RogTheme.spacing-xs;
-
-        // Header
-        HorizontalLayout {
-            padding-left: RogTheme.spacing-md;
-            padding-right: RogTheme.spacing-md;
-
-            Text {
-                text: "Point";
-                font-size: RogTheme.font-size-xs;
-                color: RogTheme.text-tertiary;
-                width: 60px;
-            }
-
-            Text {
-                text: "Temp";
-                font-size: RogTheme.font-size-xs;
-                color: RogTheme.text-tertiary;
-                width: 60px;
-            }
-
-            Text {
-                text: "Fan Speed";
-                font-size: RogTheme.font-size-xs;
-                color: RogTheme.text-tertiary;
-                horizontal-stretch: 1;
-            }
-
-            Text {
-                text: "PWM";
-                font-size: RogTheme.font-size-xs;
-                color: RogTheme.text-tertiary;
-                width: 50px;
-                horizontal-alignment: right;
-            }
-        }
-
-        // Curve points
-        for point[idx] in curve: CurvePointRow {
-            index: idx;
-            temp: point.temp;
-            pwm: point.pwm;
-            accent: curve_color;
-        }
-    }
-}
-
 // Main fans page
 export component PageFans inherits Rectangle {
     background: transparent;
@@ -415,19 +341,19 @@ export component PageFans inherits Rectangle {
                 ProfileTab {
                     label: "Balanced";
                     selected: FansPageData.selected_profile == 0;
-                    clicked => { FansPageData.selected_profile = 0; }
+                    clicked => { FansPageData.selected_profile = 0; FansPageData.cb_profile_changed(0); }
                 }
 
                 ProfileTab {
                     label: "Performance";
                     selected: FansPageData.selected_profile == 1;
-                    clicked => { FansPageData.selected_profile = 1; }
+                    clicked => { FansPageData.selected_profile = 1; FansPageData.cb_profile_changed(1); }
                 }
 
                 ProfileTab {
                     label: "Quiet";
                     selected: FansPageData.selected_profile == 2;
-                    clicked => { FansPageData.selected_profile = 2; }
+                    clicked => { FansPageData.selected_profile = 2; FansPageData.cb_profile_changed(2); }
                 }
             }
         }
@@ -468,16 +394,38 @@ export component PageFans inherits Rectangle {
             }
         }
 
-        // Fan curve visualization
-        FanCurveVisualization {
+        // Fan curve graph - Interactive draggable curve editor
+        Rectangle {
             vertical-stretch: 1;
-            curve: FansPageData.selected_fan == 0 ? FansPageData.cpu_fan_curve : FansPageData.gpu_fan_curve;
-            curve_color: FansPageData.selected_fan == 0 ? RogTheme.accent-red : RogTheme.accent-purple;
+            background: RogTheme.bg-card;
+            border-radius: RogTheme.radius-lg;
+            border-width: 1px;
+            border-color: RogTheme.border-default;
+
+            // Select the correct curve based on profile and fan selection
+            property <[Node]> current_curve:
+                FansPageData.selected_fan == 0 ? (
+                    FansPageData.selected_profile == 0 ? FansPageData.cpu_fan_curve_balanced :
+                    FansPageData.selected_profile == 1 ? FansPageData.cpu_fan_curve_performance :
+                    FansPageData.cpu_fan_curve_quiet
+                ) : (
+                    FansPageData.selected_profile == 0 ? FansPageData.gpu_fan_curve_balanced :
+                    FansPageData.selected_profile == 1 ? FansPageData.gpu_fan_curve_performance :
+                    FansPageData.gpu_fan_curve_quiet
+                );
+
+            Graph {
+                width: 100%;
+                height: 100%;
+                nodes <=> parent.current_curve;
+                node_min: { x: 0px, y: 0px };
+                node_max: { x: 100px, y: 255px };
+            }
         }
 
         // Info text
         Text {
-            text: "Fan curves show fan speed (PWM %) at different temperature thresholds. Use Reset to restore defaults.";
+            text: "Drag points to adjust fan speed at each temperature. Apply to save changes.";
             font-size: RogTheme.font-size-sm;
             color: RogTheme.text-tertiary;
             horizontal-alignment: center;

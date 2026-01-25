@@ -1,0 +1,71 @@
+import { Palette, VerticalBox, HorizontalBox, LineEdit, Button, ListView, StandardButton } from "std-widgets.slint";
+import { SystemDropdown } from "../widgets/common.slint";
+
+export struct ScenarioRuleUI {
+    app_name: string,
+    profile: string,
+}
+
+export global ScenarioData {
+    in-out property <[ScenarioRuleUI]> rules: [];
+    in-out property <string> new_app_name: "";
+    in-out property <int> new_profile_index: 0;
+    in-out property <[string]> profile_choices: ["Balanced", "Performance", "Quiet"];
+    
+    callback add_rule(string, int);
+    callback remove_rule(int);
+}
+
+export component PageScenario inherits Rectangle {
+    VerticalBox {
+        padding: 20px;
+        spacing: 20px;
+        Text {
+            text: "Scenario Profiles";
+            font-size: 24px;
+            color: Palette.control-foreground;
+        }
+
+        HorizontalBox {
+            spacing: 10px;
+            height: 40px;
+            LineEdit {
+                placeholder-text: "App Name (e.g. firefox)";
+                text <=> ScenarioData.new_app_name;
+                width: 40%;
+            }
+            SystemDropdown {
+                width: 30%;
+                model: ScenarioData.profile_choices;
+                current_index <=> ScenarioData.new_profile_index;
+                current_value: ScenarioData.profile_choices[ScenarioData.new_profile_index];
+                text: "Profile";
+            }
+            Button {
+                text: "Add Rule";
+                clicked => {
+                    ScenarioData.add_rule(ScenarioData.new_app_name, ScenarioData.new_profile_index);
+                    ScenarioData.new_app_name = "";
+                }
+            }
+        }
+
+        ListView {
+            for rule[i] in ScenarioData.rules : Rectangle {
+                height: 40px;
+                background: Palette.alternate-background;
+                border-radius: 5px;
+                HorizontalBox {
+                    padding: 5px;
+                    Text { text: rule.app_name; vertical-alignment: center; horizontal-stretch: 1; color: Palette.control-foreground; }
+                    Text { text: rule.profile; vertical-alignment: center; horizontal-stretch: 1; color: Palette.control-foreground; }
+                    Button {
+                        text: "Remove";
+                        width: 80px;
+                        clicked => { ScenarioData.remove_rule(i); }
+                    }
+                }
+            }
+        }
+    }
+}

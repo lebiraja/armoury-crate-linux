@@ -14,7 +14,7 @@ name = "armoury-crate-linux"
 path = "src/main.rs"
 
 [features]
-default = []
+default = ["nvidia"]
 mocking = []
 x11 = ["slint/backend-winit-x11"]
 nvidia = ["nvml-wrapper"]
@@ -49,6 +49,8 @@ log.workspace = true
 env_logger.workspace = true
 tokio.workspace = true
 serde.workspace = true
+toml = "0.8"
+uuid = { version = "1.0", features = ["v4"] }
 zbus.workspace = true
 dirs.workspace = true
 notify-rust.workspace = true

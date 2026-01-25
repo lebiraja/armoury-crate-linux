@@ -9,12 +9,30 @@ const CFG_DIR: &str = "rog";
 const CFG_FILE_NAME: &str = "armoury-crate-linux.cfg";
 
 /// Notification settings for the application
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct EnabledNotifications {
     pub enabled: bool,
     pub show_gpu_status: bool,
     pub show_profile_changes: bool,
     pub show_charging_status: bool,
+    /// Notify on GPU mode changes (supergfxctl)
+    pub receive_notify_gfx: bool,
+    /// Notify on dGPU power status changes
+    pub receive_notify_gfx_status: bool,
+}
+
+impl Default for EnabledNotifications {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            show_gpu_status: true,
+            show_profile_changes: true,
+            show_charging_status: true,
+            receive_notify_gfx: true,
+            receive_notify_gfx_status: true,
+        }
+    }
 }
 
 /// Main configuration for Armoury Crate Linux
@@ -36,6 +54,10 @@ pub struct Config {
     pub fullscreen_height: u32,
     /// Default page to show on startup
     pub default_page: String,
+    /// Command to run when switching to AC power
+    pub ac_command: String,
+    /// Command to run when switching to battery power
+    pub bat_command: String,
     /// System monitoring settings
     pub monitoring: MonitoringConfig,
     /// Notification settings
@@ -80,13 +102,10 @@ impl Default for Config {
             fullscreen_width: 1920,
             fullscreen_height: 1080,
             default_page: "dashboard".to_string(),
+            ac_command: String::new(),
+            bat_command: String::new(),
             monitoring: MonitoringConfig::default(),
-            notifications: EnabledNotifications {
-                enabled: true,
-                show_gpu_status: true,
-                show_profile_changes: true,
-                show_charging_status: true,
-            },
+            notifications: EnabledNotifications::default(),
         }
     }
 }

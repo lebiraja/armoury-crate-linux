@@ -1,0 +1,71 @@
+import { Palette, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export global DashboardData {
+    in-out property <float> cpu_usage: 0;
+    in-out property <float> ram_usage: 0;
+    in-out property <float> gpu_usage: 0;
+}
+
+export component PageDashboard inherits Rectangle {
+    VerticalBox {
+        padding: 20px;
+        spacing: 20px;
+        Text {
+            text: "System Dashboard";
+            font-size: 24px;
+            color: Palette.control-foreground;
+        }
+
+        HorizontalBox {
+            spacing: 20px;
+            Rectangle {
+                background: Palette.alternate-background;
+                border-radius: 10px;
+                height: 150px;
+                width: 30%;
+                VerticalBox {
+                    alignment: space-around;
+                    Text { text: "CPU Usage"; color: Palette.control-foreground; horizontal-alignment: center; }
+                    Text { 
+                        text: Math.round(DashboardData.cpu_usage) + "%"; 
+                        font-size: 32px; 
+                        horizontal-alignment: center;
+                        color: Palette.control-foreground;
+                    }
+                }
+            }
+            Rectangle {
+                background: Palette.alternate-background;
+                border-radius: 10px;
+                height: 150px;
+                width: 30%;
+                VerticalBox {
+                    alignment: space-around;
+                    Text { text: "RAM Usage"; color: Palette.control-foreground; horizontal-alignment: center; }
+                    Text { 
+                        text: Math.round(DashboardData.ram_usage) + "%"; 
+                        font-size: 32px; 
+                        horizontal-alignment: center;
+                        color: Palette.control-foreground;
+                    }
+                }
+            }
+             Rectangle {
+                background: Palette.alternate-background;
+                border-radius: 10px;
+                height: 150px;
+                width: 30%;
+                VerticalBox {
+                    alignment: space-around;
+                    Text { text: "GPU Usage"; color: Palette.control-foreground; horizontal-alignment: center; }
+                    Text { 
+                        text: Math.round(DashboardData.gpu_usage) + "%"; 
+                        font-size: 32px; 
+                        horizontal-alignment: center;
+                        color: Palette.control-foreground;
+                    }
+                }
+            }
+        }
+    }
+}

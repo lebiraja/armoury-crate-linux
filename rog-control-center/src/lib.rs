@@ -15,6 +15,8 @@ pub mod notify;
 pub mod tray;
 pub mod types;
 pub mod ui;
+pub mod monitor;
+pub mod scenario_manager;
 pub mod zbus_proxies;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -34,9 +36,11 @@ pub fn print_versions() {
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Page {
+    Dashboard,
     AppSettings,
     System,
     AuraEffects,
     AnimeMatrix,
     FanCurves,
+    Scenario,
 }

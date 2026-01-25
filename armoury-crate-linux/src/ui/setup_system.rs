@@ -3,8 +3,11 @@
 //! Connects the System page UI to D-Bus Platform interface.
 
 use log::{debug, error, info, warn};
+use rog_dbus::asus_armoury::{AsusArmouryProxy, AsusArmouryProxyBlocking};
+use rog_platform::asus_armoury::FirmwareAttribute;
 use slint::ComponentHandle;
 
+use crate::zbus_proxies::{find_iface, find_iface_async};
 use crate::{MainWindow, SystemPageData};
 
 /// Initial setup for system page - fetches current values from D-Bus
@@ -34,6 +37,8 @@ pub fn setup_system_page(ui: &MainWindow) {
     system_data.set_charge_control_end_threshold(-1.0);
     system_data.set_charge_control_enabled(false);
     system_data.set_platform_profile(0);
+    system_data.set_panel_od(false);
+    system_data.set_gpu_mux_mode(0);
 
     // Load platform profile
     if let Ok(profile) = platform.platform_profile() {
@@ -58,6 +63,23 @@ pub fn setup_system_page(ui: &MainWindow) {
         debug!("Charge threshold: {}", threshold);
         system_data.set_charge_control_end_threshold(threshold as f32);
         system_data.set_charge_control_enabled(threshold < 100);
+    }
+
+    // Load AsusArmoury attributes (Panel OD, GPU MUX)
+    if let Ok(attrs) = find_iface::<AsusArmouryProxyBlocking>("xyz.ljones.AsusArmoury") {
+        for attr in attrs {
+            if let (Ok(name), Ok(val)) = (attr.name(), attr.current_value()) {
+                match name {
+                    FirmwareAttribute::PanelOverdrive => {
+                        system_data.set_panel_od(val == 1);
+                    }
+                    FirmwareAttribute::GpuMuxMode => {
+                        system_data.set_gpu_mux_mode(val);
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     info!("System page initialized");
@@ -86,9 +108,15 @@ pub fn setup_system_page_callbacks(ui: &MainWindow) {
             }
         };
 
+        // Get AsusArmoury proxies
+        let armoury_attrs = find_iface_async::<AsusArmouryProxy>("xyz.ljones.AsusArmoury")
+            .await
+            .unwrap_or_default();
+
         // Setup callbacks inside event loop
         let platform_copy = platform.clone();
         let handle_copy = handle.clone();
+        let armoury_attrs_copy = armoury_attrs.clone();
 
         let _ = handle.upgrade_in_event_loop(move |ui| {
             // Platform profile callback
@@ -158,16 +186,59 @@ pub fn setup_system_page_callbacks(ui: &MainWindow) {
                     });
                 });
 
-            // Panel OD callback (placeholder - logs only since it requires AsusArmoury)
+            // Panel OD callback
+            let attrs_inner = armoury_attrs_copy.clone();
+            let handle_inner = handle_copy.clone();
             ui.global::<SystemPageData>().on_cb_panel_od(move |enabled| {
-                debug!("Panel OD toggle requested: {}", enabled);
-                // TODO: Implement via AsusArmouryProxy
+                let attrs = attrs_inner.clone();
+                let h = handle_inner.clone();
+                tokio::spawn(async move {
+                    for attr in attrs {
+                        if let Ok(name) = attr.name().await {
+                            if name == FirmwareAttribute::PanelOverdrive {
+                                let val = if enabled { 1 } else { 0 };
+                                if let Err(e) = attr.set_current_value(val).await {
+                                    warn!("Failed to set Panel OD: {:?}", e);
+                                } else {
+                                    let msg: slint::SharedString = format!("Panel Overdrive {}", if enabled { "enabled" } else { "disabled" }).into();
+                                    let _ = slint::invoke_from_event_loop(move || {
+                                        if let Some(ui) = h.upgrade() {
+                                            ui.invoke_show_toast(msg);
+                                        }
+                                    });
+                                }
+                                break;
+                            }
+                        }
+                    }
+                });
             });
 
-            // GPU MUX callback (placeholder - logs only since it requires AsusArmoury)
+            // GPU MUX callback
+            let attrs_inner = armoury_attrs_copy.clone();
+            let handle_inner = handle_copy.clone();
             ui.global::<SystemPageData>().on_cb_gpu_mux_mode(move |mode| {
-                debug!("GPU MUX mode change requested: {}", mode);
-                // TODO: Implement via AsusArmouryProxy
+                let attrs = attrs_inner.clone();
+                let h = handle_inner.clone();
+                tokio::spawn(async move {
+                    for attr in attrs {
+                        if let Ok(name) = attr.name().await {
+                            if name == FirmwareAttribute::GpuMuxMode {
+                                if let Err(e) = attr.set_current_value(mode).await {
+                                    warn!("Failed to set GPU MUX: {:?}", e);
+                                } else {
+                                    let msg: slint::SharedString = "GPU Mode changed - Reboot required".into();
+                                    let _ = slint::invoke_from_event_loop(move || {
+                                        if let Some(ui) = h.upgrade() {
+                                            ui.invoke_show_toast(msg);
+                                        }
+                                    });
+                                }
+                                break;
+                            }
+                        }
+                    }
+                });
             });
         });
 

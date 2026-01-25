@@ -7,9 +7,12 @@ import { PageDashboard, DashboardData } from "pages/dashboard.slint";
 import { PageAbout } from "pages/about.slint";
 import { PageSystem, SystemPageData } from "pages/system.slint";
 import { PageAura, AuraPageData } from "pages/aura.slint";
-import { PageFans, FansPageData, FanCurvePoint } from "pages/fans.slint";
+import { PageFans, FansPageData, FanCurvePoint, Node } from "pages/fans.slint";
+import { PageScenario, ScenarioData, ScenarioRuleSlint } from "pages/scenario.slint";
+import { PageAnime, AnimePageData } from "pages/anime.slint";
+import { PageSettings, SettingsData } from "pages/settings.slint";
 
-export { DashboardData, SystemPageData, AuraPageData, FansPageData, FanCurvePoint }
+export { DashboardData, SystemPageData, AuraPageData, FansPageData, FanCurvePoint, Node, ScenarioData, ScenarioRuleSlint, AnimePageData, SettingsData }
 
 export component MainWindow inherits Window {
     title: "Armoury Crate Linux";
@@ -155,26 +158,10 @@ export component MainWindow inherits Window {
                     height: 100%;
                 }
 
-                // Settings placeholder
-                if current-page == 6: Rectangle {
-                    background: RogTheme.bg-primary;
-
-                    VerticalLayout {
-                        padding: RogTheme.spacing-lg;
-
-                        Text {
-                            text: "Settings";
-                            font-size: RogTheme.font-size-h1;
-                            font-weight: 700;
-                            color: RogTheme.text-primary;
-                        }
-
-                        Text {
-                            text: "Application settings and preferences.\nComing in next update.";
-                            font-size: RogTheme.font-size-body;
-                            color: RogTheme.text-secondary;
-                        }
-                    }
+                // Settings page
+                if current-page == 6: PageSettings {
+                    width: 100%;
+                    height: 100%;
                 }
 
                 // About page

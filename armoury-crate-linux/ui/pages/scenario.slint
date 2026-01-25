@@ -1,0 +1,104 @@
+import { Palette, VerticalBox, HorizontalBox, LineEdit, Button, ListView, StandardButton, CheckBox } from "std-widgets.slint";
+
+export struct ScenarioRuleSlint {
+    id: string,
+    process_name: string,
+    profile: string,
+    aura_mode: int,
+    priority: int,
+}
+
+export global ScenarioData {
+    in-out property <[ScenarioRuleSlint]> rules: [];
+    in-out property <bool> enabled: false;
+
+    callback add_scenario_rule(string, string, int);
+    callback remove_scenario_rule(string);  // Takes rule ID as string
+    callback toggle_scenario_enabled(bool);
+}
+
+export component PageScenario inherits Rectangle {
+    VerticalBox {
+        padding: 20px;
+        spacing: 20px;
+        Text {
+            text: "Scenario Profiles";
+            font-size: 24px;
+            color: Palette.control-foreground;
+        }
+
+        HorizontalBox {
+            spacing: 10px;
+            CheckBox {
+                text: "Enable automatic profile switching";
+                checked <=> ScenarioData.enabled;
+                toggled => {
+                    ScenarioData.toggle_scenario_enabled(self.checked);
+                }
+            }
+        }
+
+        HorizontalBox {
+            spacing: 10px;
+            height: 40px;
+            LineEdit {
+                placeholder-text: "Process name (e.g. firefox)";
+                width: 30%;
+            }
+            LineEdit {
+                placeholder-text: "Profile (Balanced, Performance, Quiet)";
+                width: 30%;
+            }
+            LineEdit {
+                placeholder-text: "Aura mode (-1 for none)";
+                width: 20%;
+            }
+            Button {
+                text: "Add Rule";
+                width: 20%;
+                // Note: This needs to be wired properly
+            }
+        }
+
+        ListView {
+            for rule[i] in ScenarioData.rules : Rectangle {
+                height: 50px;
+                background: Palette.alternate-background;
+                border-radius: 5px;
+                HorizontalBox {
+                    padding: 5px;
+                    spacing: 10px;
+                    Text { 
+                        text: rule.process_name; 
+                        vertical-alignment: center; 
+                        horizontal-stretch: 1; 
+                        color: Palette.control-foreground; 
+                    }
+                    Text { 
+                        text: rule.profile; 
+                        vertical-alignment: center; 
+                        horizontal-stretch: 1; 
+                        color: Palette.control-foreground; 
+                    }
+                    Text { 
+                        text: "Aura: " + rule.aura_mode; 
+                        vertical-alignment: center; 
+                        horizontal-stretch: 1; 
+                        color: Palette.control-foreground; 
+                    }
+                    Text { 
+                        text: "Priority: " + rule.priority; 
+                        vertical-alignment: center; 
+                        horizontal-stretch: 1; 
+                        color: Palette.control-foreground; 
+                    }
+                    Button {
+                        text: "Remove";
+                        width: 80px;
+                        clicked => { ScenarioData.remove_scenario_rule(rule.id); }
+                    }
+                }
+            }
+        }
+    }
+}

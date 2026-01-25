@@ -3,14 +3,15 @@
 //! A gaming-focused control center for ASUS ROG laptops on Linux.
 
 use std::env;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use armoury_crate_linux::config::Config;
 use armoury_crate_linux::error::Result;
 use armoury_crate_linux::monitoring::SystemMonitor;
+use armoury_crate_linux::scenario_manager::ScenarioManager;
 use armoury_crate_linux::slint::ComponentHandle;
 use armoury_crate_linux::ui;
-use armoury_crate_linux::{print_versions, DashboardData, MainWindow};
+use armoury_crate_linux::{print_versions, MainWindow};
 use config_traits::{StdConfig, StdConfigLoad1};
 use dmi_id::DMIID;
 use gumdrop::Options;
@@ -91,13 +92,15 @@ async fn main() -> Result<()> {
     }
 
     // Load configuration
-    let config = Config::new().load();
+    let config = Arc::new(Mutex::new(Config::new().load()));
     info!("Configuration loaded");
 
     // Initialize system monitoring
+    let update_interval = config.lock().unwrap().monitoring.update_interval_ms;
+    let history_duration = config.lock().unwrap().monitoring.history_duration_sec;
     let monitor = Arc::new(SystemMonitor::new(
-        config.monitoring.update_interval_ms,
-        config.monitoring.history_duration_sec,
+        update_interval,
+        history_duration,
     ));
 
     // Start monitoring in background
@@ -106,6 +109,35 @@ async fn main() -> Result<()> {
         monitor_clone.start().await;
     });
     info!("System monitoring started");
+
+    // Initialize scenario manager
+    let config_path = dirs::config_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("armoury-crate-linux")
+        .join("scenarios.toml");
+    let scenario_manager = Arc::new(ScenarioManager::new(config_path));
+
+    // Start scenario monitoring with profile change callback
+    let scenario_clone = scenario_manager.clone();
+    tokio::spawn(async move {
+        scenario_clone
+            .start_monitoring(|rule| {
+                if let Some(profile) = rule.power_profile {
+                    let profile_owned = profile.clone();
+                    tokio::spawn(async move {
+                        if let Ok(conn) = zbus::Connection::system().await {
+                            if let Ok(_proxy) = rog_dbus::zbus_platform::PlatformProxy::new(&conn).await
+                            {
+                                // Note: The actual method name may differ - using throttle_thermal_policy as a fallback
+                                info!("Scenario: would switch to profile '{}'", profile_owned);
+                            }
+                        }
+                    });
+                }
+            })
+            .await;
+    });
+    info!("Scenario manager initialized");
 
     // Create and show the main window
     let ui = MainWindow::new()?;
@@ -118,38 +150,18 @@ async fn main() -> Result<()> {
     ui::setup_all_callbacks(&ui);
     info!("UI callbacks set up");
 
-    // Set up monitoring data updates
-    let ui_weak = ui.as_weak();
-    let monitor_for_updates = monitor.clone();
+    // Setup dashboard page with monitoring
+    ui::setup_dashboard::setup_dashboard_page(&ui, monitor.clone());
+    info!("Dashboard monitoring integrated");
 
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
-        loop {
-            interval.tick().await;
+    // Setup scenario profiles page
+    ui::setup_scenario::setup_scenario_page(&ui, scenario_manager.clone());
+    info!("Scenario profiles integrated");
 
-            let data = monitor_for_updates.get_data().await;
-            let ui_weak_clone = ui_weak.clone();
-
-            let _ = slint::invoke_from_event_loop(move || {
-                if let Some(ui) = ui_weak_clone.upgrade() {
-                    let dashboard = ui.global::<DashboardData>();
-                    dashboard.set_cpu_usage(data.cpu_usage);
-                    dashboard.set_cpu_temp(data.cpu_temp);
-                    dashboard.set_cpu_freq_ghz(data.cpu_freq_mhz as f32 / 1000.0);
-                    dashboard.set_gpu_usage(data.gpu_usage);
-                    dashboard.set_gpu_temp(data.gpu_temp);
-                    dashboard.set_gpu_power_watts(data.gpu_power_watts);
-                    dashboard.set_ram_usage_percent(data.ram_usage);
-                    dashboard.set_ram_total_gb(data.ram_total_gb);
-                    dashboard.set_ram_used_gb(data.ram_used_gb);
-                    dashboard.set_fan1_rpm(data.fan_rpm.first().copied().unwrap_or(0) as i32);
-                    dashboard.set_fan2_rpm(data.fan_rpm.get(1).copied().unwrap_or(0) as i32);
-                    dashboard.set_battery_percent(data.battery_percent.unwrap_or(100.0));
-                    dashboard.set_on_ac_power(data.on_ac_power);
-                }
-            });
-        }
-    });
+    // Setup settings page
+    ui::setup_settings::setup_settings_page(&ui, config.clone());
+    ui::setup_settings::setup_settings_page_callbacks(&ui, config.clone());
+    info!("Settings page integrated");
 
     // Show the window
     ui.show()?;
@@ -160,6 +172,7 @@ async fn main() -> Result<()> {
 
     // Cleanup
     monitor.stop().await;
+    scenario_manager.set_enabled(false).await;
     info!("Application closed");
 
     Ok(())

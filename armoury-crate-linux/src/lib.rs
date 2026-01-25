@@ -12,8 +12,12 @@
 pub mod config;
 pub mod error;
 pub mod monitoring;
+pub mod notify;
+pub mod scenario_manager;
+pub mod tray;
 pub mod types;
 pub mod ui;
+pub mod zbus_proxies;
 
 // Re-export slint for external use
 pub use slint;

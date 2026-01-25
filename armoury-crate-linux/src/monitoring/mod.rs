@@ -11,9 +11,14 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::debug;
+use log::{debug, warn};
 use sysinfo::System;
 use tokio::sync::RwLock;
+
+#[cfg(feature = "nvidia")]
+use nvml_wrapper::Nvml;
+#[cfg(feature = "nvidia")]
+use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
 
 /// Monitoring data snapshot
 #[derive(Debug, Clone, Default)]
@@ -89,12 +94,100 @@ impl MonitoringHistory {
     }
 }
 
+/// NVIDIA GPU monitoring via NVML
+#[cfg(feature = "nvidia")]
+struct NvidiaMonitor {
+    nvml: Option<Nvml>,
+    device_count: u32,
+}
+
+#[cfg(feature = "nvidia")]
+impl NvidiaMonitor {
+    fn new() -> Self {
+        match Nvml::init() {
+            Ok(nvml) => {
+                let device_count = nvml.device_count().unwrap_or(0);
+                if device_count > 0 {
+                    debug!("NVML initialized successfully, found {} NVIDIA GPU(s)", device_count);
+                } else {
+                    warn!("NVML initialized but no NVIDIA GPUs found");
+                }
+                Self {
+                    nvml: Some(nvml),
+                    device_count,
+                }
+            }
+            Err(e) => {
+                warn!("Failed to initialize NVML: {:?}", e);
+                Self {
+                    nvml: None,
+                    device_count: 0,
+                }
+            }
+        }
+    }
+
+    fn get_gpu_temp(&self) -> Option<f32> {
+        if let Some(ref nvml) = self.nvml {
+            if self.device_count > 0 {
+                if let Ok(device) = nvml.device_by_index(0) {
+                    if let Ok(temp) = device.temperature(TemperatureSensor::Gpu) {
+                        return Some(temp as f32);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn get_gpu_usage(&self) -> Option<f32> {
+        if let Some(ref nvml) = self.nvml {
+            if self.device_count > 0 {
+                if let Ok(device) = nvml.device_by_index(0) {
+                    if let Ok(utilization) = device.utilization_rates() {
+                        return Some(utilization.gpu as f32);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn get_gpu_power(&self) -> Option<f32> {
+        if let Some(ref nvml) = self.nvml {
+            if self.device_count > 0 {
+                if let Ok(device) = nvml.device_by_index(0) {
+                    if let Ok(power_mw) = device.power_usage() {
+                        return Some(power_mw as f32 / 1000.0); // Convert mW to W
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn _get_gpu_name(&self) -> Option<String> {
+        if let Some(ref nvml) = self.nvml {
+            if self.device_count > 0 {
+                if let Ok(device) = nvml.device_by_index(0) {
+                    if let Ok(name) = device.name() {
+                        return Some(name);
+                    }
+                }
+            }
+        }
+        None
+    }
+}
+
 /// Cached hwmon paths for faster reading
 struct HwmonPaths {
     cpu_temp_path: Option<String>,
     gpu_temp_path: Option<String>,
     gpu_busy_path: Option<String>,
     fan_paths: Vec<String>,
+    #[cfg(feature = "nvidia")]
+    nvidia: NvidiaMonitor,
 }
 
 impl HwmonPaths {
@@ -104,6 +197,8 @@ impl HwmonPaths {
             gpu_temp_path: None,
             gpu_busy_path: None,
             fan_paths: Vec::new(),
+            #[cfg(feature = "nvidia")]
+            nvidia: NvidiaMonitor::new(),
         };
         paths.discover();
         paths
@@ -248,6 +343,15 @@ impl HwmonPaths {
     }
 
     fn read_gpu_temp(&self) -> Option<f32> {
+        // Try NVIDIA first if available
+        #[cfg(feature = "nvidia")]
+        {
+            if let Some(temp) = self.nvidia.get_gpu_temp() {
+                return Some(temp);
+            }
+        }
+
+        // Fall back to hwmon
         if let Some(ref path) = self.gpu_temp_path {
             if let Ok(content) = std::fs::read_to_string(path) {
                 if let Ok(temp) = content.trim().parse::<f32>() {
@@ -259,11 +363,30 @@ impl HwmonPaths {
     }
 
     fn read_gpu_usage(&self) -> Option<f32> {
+        // Try NVIDIA first if available
+        #[cfg(feature = "nvidia")]
+        {
+            if let Some(usage) = self.nvidia.get_gpu_usage() {
+                return Some(usage);
+            }
+        }
+
+        // Fall back to hwmon
         if let Some(ref path) = self.gpu_busy_path {
             if let Ok(content) = std::fs::read_to_string(path) {
                 if let Ok(usage) = content.trim().parse::<f32>() {
                     return Some(usage);
                 }
+            }
+        }
+        None
+    }
+
+    fn read_gpu_power(&self) -> Option<f32> {
+        #[cfg(feature = "nvidia")]
+        {
+            if let Some(power) = self.nvidia.get_gpu_power() {
+                return Some(power);
             }
         }
         None
@@ -381,7 +504,6 @@ impl SystemMonitor {
     }
 }
 
-/// Collect system metrics from sysinfo
 fn collect_metrics(sys: &System, hwmon: &HwmonPaths) -> MonitoringData {
     // Calculate CPU usage from global CPU info
     let cpu_usage = sys.global_cpu_info().cpu_usage();
@@ -420,7 +542,7 @@ fn collect_metrics(sys: &System, hwmon: &HwmonPaths) -> MonitoringData {
         cpu_freq_mhz,
         gpu_usage,
         gpu_temp,
-        gpu_power_watts: 0.0, // Would need NVML for this
+        gpu_power_watts: hwmon.read_gpu_power().unwrap_or(0.0),
         ram_usage,
         ram_total_gb,
         ram_used_gb,
