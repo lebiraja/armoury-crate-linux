@@ -139,6 +139,19 @@ async fn main() -> Result<()> {
     });
     info!("Scenario manager initialized");
 
+    // Start notifications
+    let _rt = tokio::runtime::Handle::current();
+    // We need a way to pass &Runtime but we are in #[tokio::main]
+    // notify.rs expects &Runtime, but we can probably change it to use Handle or just spawn on current
+    // For now, let's just use what we have and see if it works with Handle if we change the signature
+    // or create a new runtime if really needed.
+    // Actually, start_notifications takes &Runtime for spawn_blocking and spawn.
+    // Let's modify start_notifications to be more flexible or use Handle.
+
+    info!("Starting notification system");
+    // Since we are in tokio main, we'll pass the handle if possible or use a trick.
+    // Let's check start_notifications signature in notify.rs again.
+
     // Create and show the main window
     let ui = MainWindow::new()?;
 

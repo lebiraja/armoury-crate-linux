@@ -1,0 +1,233 @@
+// Keyboard Preview Widget for Aura RGB
+// Visual representation of the keyboard with current color applied
+
+import { RogTheme } from "../theme.slint";
+
+// Single key component
+component Key inherits Rectangle {
+    in property <string> label: "";
+    in property <float> key_width: 1.0;  // Relative width (1.0 = standard key)
+    in property <color> key_color: RogTheme.accent-cyan;
+    in property <bool> is_lightbar: false;
+
+    width: key_width * 28px;
+    height: is_lightbar ? 10px : 26px;
+    border-radius: is_lightbar ? 3px : 4px;
+    background: key_color;
+    border-width: 1px;
+    border-color: key_color.brighter(0.3);
+
+    // Subtle inner shadow effect
+    Rectangle {
+        x: 1px;
+        y: 1px;
+        width: parent.width - 2px;
+        height: parent.height - 2px;
+        border-radius: parent.border-radius - 1px;
+        background: @linear-gradient(180deg,
+            key_color.brighter(0.2) 0%,
+            key_color 30%,
+            key_color.darker(0.2) 100%
+        );
+    }
+
+    // Key label
+    if label != "" && !is_lightbar: Text {
+        text: label;
+        font-size: 8px;
+        color: white.with-alpha(0.9);
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// Spacer for keyboard layout
+component KeySpacer inherits Rectangle {
+    in property <float> spacer_width: 0.5;
+    width: spacer_width * 28px;
+    height: 26px;
+    background: #00000000;
+}
+
+// Keyboard preview component
+export component KeyboardPreview inherits Rectangle {
+    in property <color> key_color: RogTheme.accent-cyan;
+    in property <bool> show_labels: true;
+
+    width: 520px;
+    height: 200px;
+    background: RogTheme.bg-tertiary;
+    border-radius: RogTheme.radius-lg;
+    border-width: 2px;
+    border-color: RogTheme.border-default;
+
+    // Glow effect based on color
+    drop-shadow-color: key_color.with-alpha(0.3);
+    drop-shadow-blur: 15px;
+
+    VerticalLayout {
+        padding: RogTheme.spacing-sm;
+        spacing: 3px;
+        alignment: center;
+
+        // ROG Function Row (smaller keys)
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: center;
+
+            KeySpacer { spacer_width: 2.5; }
+            Key { label: "🔉"; key_width: 0.9; key_color: root.key_color; height: 18px; }
+            Key { label: "🔊"; key_width: 0.9; key_color: root.key_color; height: 18px; }
+            Key { label: "🎤"; key_width: 0.9; key_color: root.key_color; height: 18px; }
+            Key { label: "🌀"; key_width: 0.9; key_color: root.key_color; height: 18px; }
+            Key { label: "ROG"; key_width: 0.9; key_color: root.key_color; height: 18px; }
+        }
+
+        // Function Row
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: center;
+
+            Key { label: "Esc"; key_width: 1.0; key_color: root.key_color; }
+            KeySpacer { spacer_width: 0.5; }
+            Key { label: "F1"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F2"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F3"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F4"; key_width: 1.0; key_color: root.key_color; }
+            KeySpacer { spacer_width: 0.3; }
+            Key { label: "F5"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F6"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F7"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F8"; key_width: 1.0; key_color: root.key_color; }
+            KeySpacer { spacer_width: 0.3; }
+            Key { label: "F9"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F10"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F11"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F12"; key_width: 1.0; key_color: root.key_color; }
+            KeySpacer { spacer_width: 0.2; }
+            Key { label: "Del"; key_width: 1.0; key_color: root.key_color; }
+        }
+
+        // Number Row
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: center;
+
+            Key { label: "~"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "1"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "2"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "3"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "4"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "5"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "6"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "7"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "8"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "9"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "0"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "-"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "="; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "⌫"; key_width: 2.0; key_color: root.key_color; }
+            KeySpacer { spacer_width: 0.2; }
+            Key { label: "▶"; key_width: 1.0; key_color: root.key_color; }
+        }
+
+        // QWERTY Row
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: center;
+
+            Key { label: "Tab"; key_width: 1.5; key_color: root.key_color; }
+            Key { label: "Q"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "W"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "E"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "R"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "T"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "Y"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "U"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "I"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "O"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "P"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "["; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "]"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "\\"; key_width: 1.5; key_color: root.key_color; }
+            KeySpacer { spacer_width: 0.2; }
+            Key { label: "■"; key_width: 1.0; key_color: root.key_color; }
+        }
+
+        // Home Row
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: center;
+
+            Key { label: "Caps"; key_width: 1.8; key_color: root.key_color; }
+            Key { label: "A"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "S"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "D"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "F"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "G"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "H"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "J"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "K"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "L"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: ";"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "'"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "Enter"; key_width: 2.2; key_color: root.key_color; }
+            KeySpacer { spacer_width: 0.2; }
+            Key { label: "⏭"; key_width: 1.0; key_color: root.key_color; }
+        }
+
+        // Bottom Row
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: center;
+
+            Key { label: "Shift"; key_width: 2.3; key_color: root.key_color; }
+            Key { label: "Z"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "X"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "C"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "V"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "B"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "N"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "M"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: ","; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "."; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "/"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "Shift"; key_width: 2.7; key_color: root.key_color; }
+            KeySpacer { spacer_width: 0.2; }
+            Key { label: "⏮"; key_width: 1.0; key_color: root.key_color; }
+        }
+
+        // Control Row with Arrows
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: center;
+
+            Key { label: "Ctrl"; key_width: 1.3; key_color: root.key_color; }
+            Key { label: "Fn"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "⊞"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "Alt"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: ""; key_width: 5.5; key_color: root.key_color; }  // Spacebar
+            Key { label: "Alt"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "Prt"; key_width: 1.0; key_color: root.key_color; }
+            Key { label: "Ctrl"; key_width: 1.0; key_color: root.key_color; }
+            KeySpacer { spacer_width: 0.2; }
+            Key { label: "←"; key_width: 0.9; key_color: root.key_color; }
+            Key { label: "↑↓"; key_width: 0.9; key_color: root.key_color; }
+            Key { label: "→"; key_width: 0.9; key_color: root.key_color; }
+        }
+
+        // Lightbar
+        HorizontalLayout {
+            spacing: 0px;
+            alignment: center;
+            padding-top: 4px;
+
+            // Left lightbar
+            Key { key_width: 0.5; key_color: root.key_color; is_lightbar: true; }
+            // Bottom lightbar (full width)
+            Key { key_width: 16.0; key_color: root.key_color; is_lightbar: true; }
+            // Right lightbar
+            Key { key_width: 0.5; key_color: root.key_color; is_lightbar: true; }
+        }
+    }
+}

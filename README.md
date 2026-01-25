@@ -71,10 +71,26 @@ The list is a bit outdated as many features have been enabled in the Linux kerne
 - [x] Fan curve control on supported laptops (G14/G15, some TUF like FA507)
 - [x] Toggle bios setting for boot/POST sound
 - [x] Toggle GPU MUX (g-sync, or called MUX on 2022+ laptops)
+- [x] Real-time system monitoring (CPU, GPU, RAM, fans, battery)
+- [x] NVIDIA GPU monitoring via NVML
+- [x] Scenario profiles with automatic power/Aura switching
 
 ## GUI
 
-A gui is now in the repo - ROG Control Center. At this time it is still a WIP, but it has almost all features in place already.
+Two GUI applications are available:
+
+### ROG Control Center (rog-control-center)
+The original GUI application (WIP) with most features in place.
+
+### Armoury Crate Linux (armoury-crate-linux)
+A modernized replacement inspired by Windows Armoury Crate, featuring:
+- **Enhanced Real-time Dashboard**: CPU/GPU monitoring with temperature, usage, and power metrics
+- **NVIDIA GPU Support**: Full NVML integration for accurate GPU monitoring
+- **Scenario Profiles**: Auto-switch power profiles and Aura modes based on running processes (Wayland-compatible)
+- **Comprehensive System Monitoring**: CPU, GPU (NVIDIA/AMD), RAM, fans, battery, and power draw
+- **Time-series Graphs**: Historical data visualization for temperatures and usage
+- **Thread-safe Architecture**: Modern async/await design with Arc<RwLock> patterns
+- **Configuration Persistence**: TOML-based settings storage
 
 **NOTE**: Xorg is not supported.
 

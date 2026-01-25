@@ -1,0 +1,357 @@
+// HSV Color Picker Widget for Aura RGB
+// Provides hue selection via gradient bar and saturation-value picker
+
+import { RogTheme } from "../theme.slint";
+
+// Color picker component with HSV controls
+export component ColorWheel inherits Rectangle {
+    // Output color in RGB
+    in-out property <int> red: 255;
+    in-out property <int> green: 0;
+    in-out property <int> blue: 85;
+
+    // Internal HSV values (0-1 range)
+    in-out property <float> hue: 0.0;        // 0-1 maps to 0-360 degrees
+    in-out property <float> saturation: 1.0; // 0-1
+    in-out property <float> value: 1.0;      // 0-1
+
+    // Callbacks
+    callback color_changed(int, int, int);
+    callback hue_changed(float);
+    callback sv_changed(float, float);
+
+    // Size
+    width: 340px;
+    height: 220px;
+    background: #00000000;
+
+    // Convert HSV to RGB (approximation using pure hue colors)
+    // This uses the 6 primary hue sectors
+    function hsv_to_rgb_r(h: float, s: float, v: float) -> int {
+        // Simplified HSV to RGB for red channel
+        if (h < 0.1667) { return round(v * 255 * (1 - s * (1 - h * 6))); }
+        if (h < 0.3333) { return round(v * 255 * (1 - s)); }
+        if (h < 0.5) { return round(v * 255 * (1 - s)); }
+        if (h < 0.6667) { return round(v * 255 * (1 - s * (1 - (h - 0.5) * 6))); }
+        if (h < 0.8333) { return round(v * 255); }
+        return round(v * 255);
+    }
+
+    HorizontalLayout {
+        spacing: RogTheme.spacing-lg;
+        padding: RogTheme.spacing-sm;
+
+        // Left side: Hue gradient bar (vertical)
+        VerticalLayout {
+            spacing: RogTheme.spacing-sm;
+
+            Text {
+                text: "Hue";
+                font-size: RogTheme.font-size-sm;
+                color: RogTheme.text-tertiary;
+                horizontal-alignment: center;
+            }
+
+            // Hue bar with rainbow gradient
+            Rectangle {
+                width: 36px;
+                height: 180px;
+                border-radius: RogTheme.radius-md;
+                border-width: 2px;
+                border-color: RogTheme.border-default;
+                clip: true;
+
+                // Rainbow gradient background (vertical)
+                Rectangle {
+                    width: 100%;
+                    height: 100%;
+                    background: @linear-gradient(180deg,
+                        hsv(0, 1, 1) 0%,
+                        hsv(60, 1, 1) 16.67%,
+                        hsv(120, 1, 1) 33.33%,
+                        hsv(180, 1, 1) 50%,
+                        hsv(240, 1, 1) 66.67%,
+                        hsv(300, 1, 1) 83.33%,
+                        hsv(360, 1, 1) 100%
+                    );
+                }
+
+                // Hue indicator
+                Rectangle {
+                    x: 0;
+                    y: clamp(root.hue * (parent.height - 8px), 0px, parent.height - 8px);
+                    width: 100%;
+                    height: 8px;
+                    background: #00000000;
+                    border-width: 3px;
+                    border-color: white;
+                    border-radius: 4px;
+
+                    drop-shadow-color: rgba(0, 0, 0, 0.5);
+                    drop-shadow-blur: 4px;
+                }
+
+                // Touch area for hue selection
+                hue-touch := TouchArea {
+                    moved => {
+                        root.hue = clamp(self.mouse-y / parent.height, 0, 1);
+                        root.hue_changed(root.hue);
+                        root.update_rgb();
+                    }
+                    clicked => {
+                        root.hue = clamp(self.mouse-y / parent.height, 0, 1);
+                        root.hue_changed(root.hue);
+                        root.update_rgb();
+                    }
+                }
+            }
+        }
+
+        // Center: Saturation-Value picker (square)
+        VerticalLayout {
+            spacing: RogTheme.spacing-sm;
+
+            Text {
+                text: "Saturation / Value";
+                font-size: RogTheme.font-size-sm;
+                color: RogTheme.text-tertiary;
+                horizontal-alignment: center;
+            }
+
+            // SV Picker square
+            Rectangle {
+                width: 180px;
+                height: 180px;
+                border-radius: RogTheme.radius-md;
+                border-width: 2px;
+                border-color: RogTheme.border-default;
+                clip: true;
+
+                // Base hue color
+                Rectangle {
+                    width: 100%;
+                    height: 100%;
+                    background: hsv(root.hue * 360, 1, 1);
+                }
+
+                // Saturation gradient (white to transparent, left to right)
+                Rectangle {
+                    width: 100%;
+                    height: 100%;
+                    background: @linear-gradient(90deg, white 0%, transparent 100%);
+                }
+
+                // Value gradient (transparent to black, top to bottom)
+                Rectangle {
+                    width: 100%;
+                    height: 100%;
+                    background: @linear-gradient(180deg, transparent 0%, black 100%);
+                }
+
+                // Selection indicator circle
+                Rectangle {
+                    x: clamp(root.saturation * (parent.width - 16px), 0px, parent.width - 16px);
+                    y: clamp((1 - root.value) * (parent.height - 16px), 0px, parent.height - 16px);
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 8px;
+                    background: rgb(root.red, root.green, root.blue);
+                    border-width: 3px;
+                    border-color: white;
+
+                    drop-shadow-color: rgba(0, 0, 0, 0.5);
+                    drop-shadow-blur: 6px;
+                }
+
+                // Touch area for SV selection
+                sv-touch := TouchArea {
+                    moved => {
+                        root.saturation = clamp(self.mouse-x / parent.width, 0, 1);
+                        root.value = 1 - clamp(self.mouse-y / parent.height, 0, 1);
+                        root.sv_changed(root.saturation, root.value);
+                        root.update_rgb();
+                    }
+                    clicked => {
+                        root.saturation = clamp(self.mouse-x / parent.width, 0, 1);
+                        root.value = 1 - clamp(self.mouse-y / parent.height, 0, 1);
+                        root.sv_changed(root.saturation, root.value);
+                        root.update_rgb();
+                    }
+                }
+            }
+        }
+
+        // Right side: Color preview and values
+        VerticalLayout {
+            spacing: RogTheme.spacing-md;
+            alignment: center;
+
+            // Current color preview
+            Rectangle {
+                width: 80px;
+                height: 80px;
+                border-radius: RogTheme.radius-lg;
+                background: rgb(root.red, root.green, root.blue);
+                border-width: 3px;
+                border-color: RogTheme.border-default;
+
+                drop-shadow-color: rgb(root.red, root.green, root.blue).with-alpha(0.6);
+                drop-shadow-blur: 20px;
+            }
+
+            // RGB Values display
+            VerticalLayout {
+                spacing: 4px;
+                alignment: center;
+
+                Text {
+                    text: "RGB";
+                    font-size: RogTheme.font-size-xs;
+                    color: RogTheme.text-tertiary;
+                    horizontal-alignment: center;
+                }
+
+                HorizontalLayout {
+                    spacing: 2px;
+                    alignment: center;
+
+                    Text {
+                        text: root.red;
+                        font-size: RogTheme.font-size-sm;
+                        color: #FF6666;
+                        horizontal-alignment: center;
+                        width: 24px;
+                    }
+                    Text {
+                        text: ",";
+                        font-size: RogTheme.font-size-sm;
+                        color: RogTheme.text-tertiary;
+                    }
+                    Text {
+                        text: root.green;
+                        font-size: RogTheme.font-size-sm;
+                        color: #66FF66;
+                        horizontal-alignment: center;
+                        width: 24px;
+                    }
+                    Text {
+                        text: ",";
+                        font-size: RogTheme.font-size-sm;
+                        color: RogTheme.text-tertiary;
+                    }
+                    Text {
+                        text: root.blue;
+                        font-size: RogTheme.font-size-sm;
+                        color: #6666FF;
+                        horizontal-alignment: center;
+                        width: 24px;
+                    }
+                }
+            }
+        }
+    }
+
+    // Update RGB from HSV - called from Rust backend
+    public function update_rgb() {
+        // HSV to RGB conversion is done in callbacks
+        // This signals the change to the backend
+        root.color_changed(root.red, root.green, root.blue);
+    }
+
+    // Set from RGB values (for initialization)
+    public function set_from_rgb(r: int, g: int, b: int) {
+        root.red = r;
+        root.green = g;
+        root.blue = b;
+        // HSV calculation is done in Rust backend
+    }
+}
+
+// Compact color preset button
+export component ColorPreset inherits Rectangle {
+    in property <color> preset_color: #00000000;
+    in property <bool> is_empty: true;
+    in property <bool> is_selected: false;
+    in property <int> index: 0;
+
+    callback clicked();
+    callback save_requested();
+    callback delete_requested();
+
+    width: 36px;
+    height: 36px;
+    border-radius: RogTheme.radius-md;
+    background: is_empty ? RogTheme.bg-tertiary : preset_color;
+    border-width: is_selected ? 3px : 2px;
+    border-color: is_selected ? white : RogTheme.border-default;
+
+    drop-shadow-color: is_selected ? preset_color.with-alpha(0.5) : #00000000;
+    drop-shadow-blur: is_selected ? 12px : 0px;
+
+    states [
+        hover when touch.has-hover && !is_selected: {
+            border-color: RogTheme.border-hover;
+            in {
+                animate border-color { duration: RogTheme.anim-fast; }
+            }
+        }
+    ]
+
+    // Plus icon for empty slots
+    if is_empty: Text {
+        text: "+";
+        font-size: 20px;
+        color: RogTheme.text-tertiary;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    touch := TouchArea {
+        clicked => {
+            if (root.is_empty) {
+                root.save_requested();
+            } else {
+                root.clicked();
+            }
+        }
+    }
+}
+
+// Color presets row
+export component ColorPresetsRow inherits Rectangle {
+    in property <[color]> presets: [#00000000, #00000000, #00000000, #00000000, #00000000, #00000000, #00000000, #00000000];
+    in property <[bool]> preset_filled: [false, false, false, false, false, false, false, false];
+    in property <int> selected_preset: -1;
+
+    callback preset_clicked(int);
+    callback save_preset(int);
+    callback delete_preset(int);
+
+    height: 52px;
+    background: #00000000;
+
+    VerticalLayout {
+        spacing: RogTheme.spacing-xs;
+
+        Text {
+            text: "Saved Colors";
+            font-size: RogTheme.font-size-sm;
+            color: RogTheme.text-tertiary;
+        }
+
+        HorizontalLayout {
+            spacing: RogTheme.spacing-sm;
+
+            for i in 8: ColorPreset {
+                preset_color: root.presets[i];
+                is_empty: !root.preset_filled[i];
+                is_selected: root.selected_preset == i;
+                index: i;
+
+                clicked => { root.preset_clicked(i); }
+                save_requested => { root.save_preset(i); }
+                delete_requested => { root.delete_preset(i); }
+            }
+        }
+    }
+}

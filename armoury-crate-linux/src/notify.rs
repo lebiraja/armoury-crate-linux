@@ -9,8 +9,12 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use futures_util::StreamExt;
 use log::{debug, error, info, warn};
 use notify_rust::{Hint, Notification, Timeout};
+use rog_dbus::asus_armoury::AsusArmouryProxy;
+use rog_platform::asus_armoury::FirmwareAttribute;
+use rog_platform::platform::GpuMode;
 use rog_platform::power::AsusPower;
 use serde::{Deserialize, Serialize};
 use supergfxctl::pci_device::GfxPower;
@@ -19,6 +23,7 @@ use tokio::task::JoinHandle;
 
 use crate::config::Config;
 use crate::error::Result;
+use crate::zbus_proxies::find_iface_async;
 
 const NOTIF_HEADER: &str = "ROG Control";
 
@@ -145,41 +150,50 @@ pub fn start_notifications(
     start_dpu_status_mon(config.clone());
 
     // GPU MUX Mode notif
-    // TODO: need to get armoury attrs and iter to find
-    // let enabled_notifications_copy = config.clone();
-    // tokio::spawn(async move {
-    //     let conn = zbus::Connection::system().await.map_err(|e| {
-    //         error!("zbus signal: receive_notify_gpu_mux_mode: {e}");
-    //         e
-    //     })?;
-    //     let proxy = PlatformProxy::new(&conn).await.map_err(|e| {
-    //         error!("zbus signal: receive_notify_gpu_mux_mode: {e}");
-    //         e
-    //     })?;
-
-    //     let mut actual_mux_mode = GpuMode::Error;
-    //     if let Ok(mode) = proxy.gpu_mux_mode().await {
-    //         actual_mux_mode = GpuMode::from(mode);
-    //     }
-
-    //     info!("Started zbus signal thread: receive_notify_gpu_mux_mode");
-    //     while let Some(e) =
-    // proxy.receive_gpu_mux_mode_changed().await.next().await {         if let
-    // Ok(config) = enabled_notifications_copy.lock() {             if
-    // !config.notifications.enabled || !config.notifications.receive_notify_gfx {
-    //                 continue;
-    //             }
-    //         }
-    //         if let Ok(out) = e.get().await {
-    //             let mode = GpuMode::from(out);
-    //             if mode == actual_mux_mode {
-    //                 continue;
-    //             }
-    //             do_mux_notification("Reboot required. BIOS GPU MUX mode set to",
-    // &mode).ok();         }
-    //     }
-    //     Ok::<(), zbus::Error>(())
-    // });
+    let enabled_notifications_copy = config.clone();
+    rt.spawn(async move {
+        let attrs = match find_iface_async::<AsusArmouryProxy>("xyz.ljones.AsusArmoury").await {
+            Ok(attrs) => attrs,
+            Err(_) => return,
+        };
+        
+        for attr in attrs {
+            let name = match attr.name().await {
+                Ok(name) => name,
+                Err(_) => continue,
+            };
+            
+            if name == FirmwareAttribute::GpuMuxMode {
+                let mut last_mode = attr.current_value().await.unwrap_or(-1);
+                let mut stream = attr.receive_current_value_changed().await;
+                info!("Started monitoring GPU MUX mode changes");
+                while let Some(signal) = stream.next().await {
+                    if let Ok(new_val) = signal.get().await {
+                        if new_val != last_mode {
+                            let config_copy = enabled_notifications_copy.clone();
+                            let should_notify = tokio::task::spawn_blocking(move || {
+                                config_copy.lock()
+                                    .map(|config| config.notifications.enabled && config.notifications.receive_notify_gfx)
+                                    .unwrap_or(false)
+                            }).await.unwrap_or(false);
+                            
+                            if !should_notify {
+                                last_mode = new_val;
+                                continue;
+                            }
+                            let mode = GpuMode::from(new_val as u8);
+                            do_mux_notification("Reboot required. BIOS GPU MUX mode set to", &mode)
+                                .show()
+                                .unwrap()
+                                .on_close(|_| ());
+                            last_mode = new_val;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    });
 
     Ok(vec![blocking])
 }
@@ -205,6 +219,16 @@ fn do_gpu_status_notif(message: &str, data: &GfxPower) -> Notification {
         GfxPower::AsusDisabled => "asus_notif_white",
         GfxPower::AsusMuxDiscreet | GfxPower::Active => "asus_notif_red",
         GfxPower::Unknown => "gpu-integrated",
+    };
+    notif.icon(icon);
+    notif
+}
+
+fn do_mux_notification(message: &str, mode: &GpuMode) -> Notification {
+    let mut notif = base_notification(message, mode);
+    let icon = match mode {
+        GpuMode::Ultimate => "asus_notif_red",
+        _ => "asus_notif_green",
     };
     notif.icon(icon);
     notif
