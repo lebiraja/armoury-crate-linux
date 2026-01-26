@@ -22,7 +22,8 @@ pub fn setup_dashboard_page(ui: &MainWindow, monitor: Arc<SystemMonitor>) {
 
     // Update UI with monitoring data
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(1));
+        // Update faster for smoother UI (500ms)
+        let mut interval = tokio::time::interval(Duration::from_millis(500));
 
         loop {
             interval.tick().await;

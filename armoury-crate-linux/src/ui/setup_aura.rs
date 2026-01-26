@@ -391,7 +391,7 @@ pub fn setup_aura_page_callbacks(ui: &MainWindow) {
 
                 // Save preset callback
                 let h = handle_for_callbacks.clone();
-                ui.global::<AuraPageData>().on_cb_save_preset(move |index| {
+                ui.global::<AuraPageData>().on_cb_save_color_preset(move |index| {
                     let h_inner = h.clone();
                     let _ = slint::invoke_from_event_loop(move || {
                         if let Some(ui) = h_inner.upgrade() {
@@ -420,7 +420,7 @@ pub fn setup_aura_page_callbacks(ui: &MainWindow) {
                 // Load preset callback
                 let proxy = aura_copy.clone();
                 let h = handle_for_callbacks.clone();
-                ui.global::<AuraPageData>().on_cb_load_preset(move |index| {
+                ui.global::<AuraPageData>().on_cb_load_color_preset(move |index| {
                     let p = proxy.clone();
                     let h_inner = h.clone();
 
@@ -454,7 +454,7 @@ pub fn setup_aura_page_callbacks(ui: &MainWindow) {
 
                 // Delete preset callback
                 let h = handle_for_callbacks.clone();
-                ui.global::<AuraPageData>().on_cb_delete_preset(move |index| {
+                ui.global::<AuraPageData>().on_cb_delete_color_preset(move |index| {
                     let h_inner = h.clone();
                     let _ = slint::invoke_from_event_loop(move || {
                         if let Some(ui) = h_inner.upgrade() {
@@ -475,6 +475,26 @@ pub fn setup_aura_page_callbacks(ui: &MainWindow) {
                             }
                         }
                     });
+                });
+
+                // Mode name callback
+                ui.global::<AuraPageData>().on_get_mode_name(|mode_val| {
+                    let mode_name = match mode_val {
+                        0 => "Static",
+                        1 => "Breathing",
+                        2 => "Color Cycle",
+                        3 => "Rainbow",
+                        4 => "Starry Night",
+                        5 => "Rain",
+                        6 => "Reactive",
+                        7 => "Laser",
+                        8 => "Ripple",
+                        10 => "Pulse",
+                        11 => "Comet",
+                        12 => "Strobing",
+                        _ => "Unknown",
+                    };
+                    mode_name.into()
                 });
         }
         });

@@ -38,9 +38,9 @@ export global AuraPageData {
     in-out property <[color]> saved_presets: [#00000000, #00000000, #00000000, #00000000, #00000000, #00000000, #00000000, #00000000];
     in-out property <[bool]> preset_filled: [false, false, false, false, false, false, false, false];
     in-out property <int> selected_preset: -1;
-    callback cb_save_preset(int);
-    callback cb_load_preset(int);
-    callback cb_delete_preset(int);
+    callback cb_save_color_preset(int);
+    callback cb_load_color_preset(int);
+    callback cb_delete_color_preset(int);
 
     // Mode enabled flags
     in-out property <[bool]> mode_enabled: [
@@ -304,11 +304,7 @@ export component PageAura inherits Rectangle {
 
                     // Header: Selected Mode Name
                     Text {
-                        text: AuraPageData.led_mode == 0 ? "Static" :
-                              AuraPageData.led_mode == 1 ? "Breathing" :
-                              AuraPageData.led_mode == 2 ? "Color Cycle" :
-                              AuraPageData.led_mode == 3 ? "Rainbow" :
-                              "Effect Settings";
+                        text: AuraPageData.get_mode_name(AuraPageData.led_mode);
                         font-size: RogTheme.font-size-h3;
                         font-weight: 700;
                         color: RogTheme.text-primary;
@@ -322,8 +318,8 @@ export component PageAura inherits Rectangle {
                         GradientBar {}
                     }
 
-                    // For Static/Breathing: Show Color Wheel
-                    if AuraPageData.led_mode == 0 || AuraPageData.led_mode == 1 || AuraPageData.led_mode == 12 : VerticalLayout {
+                    // For Static/Breathing/Strobing/StarryNight: Show Color Wheel
+                    if AuraPageData.led_mode == 0 || AuraPageData.led_mode == 1 || AuraPageData.led_mode == 12 || AuraPageData.led_mode == 4 : VerticalLayout {
                         spacing: 8px;
                         Text { text: "Color"; color: RogTheme.text-secondary; }
 

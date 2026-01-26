@@ -261,18 +261,26 @@ export component GlassProgress inherits Rectangle {
 
         // Track
         Rectangle {
-            height: 8px;
-            border-radius: 4px;
-            background: RogTheme.bg-tertiary;
+            height: 10px;
+            border-radius: 5px;
+            background: RogTheme.bg-tertiary.with-alpha(0.5);
+            border-width: 1px;
+            border-color: RogTheme.glass-border;
+            clip: true;
 
             // Fill
             Rectangle {
+                x: 0;
                 width: clamp(value, 0, 1) * parent.width;
                 height: 100%;
-                border-radius: 4px;
-                background: @linear-gradient(90deg, bar-color.darker(0.2), bar-color);
+                border-radius: 5px;
+                background: @linear-gradient(90deg, bar-color.darker(0.1), bar-color);
 
-                animate width { duration: RogTheme.anim-normal; }
+                // Glow effect
+                drop-shadow-color: bar-color.with-alpha(0.6);
+                drop-shadow-blur: 8px;
+
+                animate width { duration: 250ms; easing: ease-out-quad; }
             }
         }
 
